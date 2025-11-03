@@ -1,10 +1,9 @@
 from django.db import models
-from django.conf import settings
-from django.utils import timezone
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-# Create your models here.
+
+
 class Compra(models.Model):
     proveedor = models.ForeignKey(
         "terceros.Proveedor", 
@@ -18,11 +17,6 @@ class Compra(models.Model):
         null=True,
         related_name="compras"
     )
-    precio_por_gramo = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
     metodo_pago = models.ForeignKey(
         "dominios_comunes.MetodoPago", 
         on_delete=models.RESTRICT
@@ -32,78 +26,43 @@ class Compra(models.Model):
     total = models.DecimalField(
         max_digits=12, 
         decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
+        validators=[MinValueValidator(Decimal('0.01'))],
+        editable=False,
+        default=Decimal('0.00')
     )
 
     def __str__(self):
         return f"Compra - {self.proveedor.nombre} - ${self.total}"
 
-    def clean(self):
-        if self.precio_por_gramo <= 0:
-            raise ValidationError("El precio por gramo debe ser mayor que cero")
-        if self.total <= 0:
-            raise ValidationError("El total debe ser mayor que cero")
+    def calcular_total(self):
+        """
+        Calcula el total sumando los subtotales de todas las prendas.
+        
+        total = suma(subtotal de cada prenda)
+        
+        Donde cada subtotal es:
+        subtotal_prenda = (gramos_prenda * precio_por_gramo) * cantidad
+        """
+        total = Decimal('0.00')
+        for prenda_item in self.prendas.all():
+            total += prenda_item.subtotal
+        return total
 
-    def total_gramos(self):
-        """Calcula el total de gramos en la compra"""
-        return sum(cp.prenda.gramos * cp.cantidad for cp in self.prendas.all())
+    def save(self, *args, **kwargs):
+        """Recalcular total antes de guardar"""
+        self.total = self.calcular_total()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        """Validaciones a nivel de modelo"""
+        if self.prendas.count() == 0:
+            raise ValidationError("La compra debe contener al menos una prenda")
 
     class Meta:
         verbose_name = "Compra"
         verbose_name_plural = "Compras"
         ordering = ['-fecha']
 
-class CompraPrenda(models.Model):
-    compra = models.ForeignKey(
-        "Compra", 
-        on_delete=models.CASCADE, 
-        related_name="prendas"
-    )
-    prenda = models.ForeignKey(
-        "prendas.Prenda", 
-        on_delete=models.CASCADE
-    )
-    cantidad = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)]
-    )
-
-    def __str__(self):
-        return f"{self.compra} - {self.prenda} (Cant: {self.cantidad})"
-
-    def clean(self):
-        if self.cantidad <= 0:
-            raise ValidationError("La cantidad debe ser mayor que cero")
-
-    def save(self, *args, **kwargs):
-        # Control automático de inventario
-        is_new = self.pk is None
-        if is_new:
-            # Nueva compra - aumentar existencia
-            super().save(*args, **kwargs)
-            self.prenda.existencia += self.cantidad
-            self.prenda.save(update_fields=['existencia'])
-        else:
-            # Actualización - calcular diferencia
-            old_instance = CompraPrenda.objects.get(pk=self.pk)
-            super().save(*args, **kwargs)
-            diferencia = self.cantidad - old_instance.cantidad
-            self.prenda.existencia += diferencia
-            self.prenda.save(update_fields=['existencia'])
-
-    def delete(self, *args, **kwargs):
-        # Reducir existencia al eliminar
-        self.prenda.existencia -= self.cantidad
-        self.prenda.save(update_fields=['existencia'])
-        super().delete(*args, **kwargs)
-
-    def subtotal_gramos(self):
-        """Calcula el subtotal en gramos"""
-        return self.prenda.gramos * self.cantidad
-
-    class Meta:
-        verbose_name = "Compra Prenda"
-        verbose_name_plural = "Compras Prendas"
-        unique_together = ['compra', 'prenda']
 
 class Venta(models.Model):
     cliente = models.ForeignKey(
@@ -125,16 +84,6 @@ class Venta(models.Model):
         null=True,
         related_name="ventas"
     )
-    precio_por_gramo = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
-    gramo_ganancia = models.DecimalField(
-        max_digits=8, 
-        decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0'))]
-    )
     metodo_pago = models.ForeignKey(
         "dominios_comunes.MetodoPago", 
         on_delete=models.RESTRICT
@@ -144,31 +93,73 @@ class Venta(models.Model):
     total = models.DecimalField(
         max_digits=12, 
         decimal_places=2, 
-        validators=[MinValueValidator(Decimal('0.01'))]
+        validators=[MinValueValidator(Decimal('0.01'))],
+        editable=False,
+        default=Decimal('0.00')
     )
 
     def __str__(self):
         return f"Venta - {self.cliente.nombre} - ${self.total}"
 
-    def clean(self):
-        # Validación XOR crítica: una venta NO puede tener crédito Y apartado
-        if self.credito and self.apartado:
-            raise ValidationError("Una venta no puede tener tanto crédito como apartado al mismo tiempo")
+    def calcular_total(self):
+        """
+        Calcula el total sumando los subtotales de todas las prendas.
         
-        if self.precio_por_gramo <= 0:
-            raise ValidationError("El precio por gramo debe ser mayor que cero")
-        if self.gramo_ganancia < 0:
-            raise ValidationError("La ganancia por gramo no puede ser negativa")
-        if self.total <= 0:
-            raise ValidationError("El total debe ser mayor que cero")
+        total = suma(subtotal de cada prenda)
+        
+        Donde cada subtotal es:
+        subtotal_prenda = ((gramos_prenda + gramo_ganancia) * precio_por_gramo) * cantidad
+        """
+        total = Decimal('0.00')
+        for prenda_item in self.prendas.all():
+            total += prenda_item.subtotal
+        return total
+
+    def calcular_ganancia_total(self):
+        """
+        Calcula la ganancia total sumando la ganancia de cada prenda.
+        
+        Para cada prenda:
+        gramos_ajustados = gramos_prenda + gramo_ganancia
+        gramos_totales = gramos_ajustados * cantidad
+        
+        Luego sumamos todas las ganancias:
+        ganancia_prenda = (gramo_ganancia * cantidad) * precio_por_gramo
+        ganancia_total = suma(ganancia de cada prenda)
+        """
+        ganancia = Decimal('0.00')
+        for prenda_item in self.prendas.all():
+            # Ganancia = (gramo_ganancia * cantidad) * precio_por_gramo
+            ganancia_prenda = (prenda_item.gramo_ganancia * prenda_item.cantidad) * prenda_item.precio_por_gramo
+            ganancia += ganancia_prenda
+        return ganancia
 
     def total_gramos(self):
-        """Calcula el total de gramos en la venta"""
-        return sum(vp.prenda.gramos * vp.cantidad for vp in self.prendas.all())
+        """
+        Calcula el total de gramos sin ajuste de ganancia.
+        total_gramos = suma(gramos_prenda * cantidad)
+        """
+        total = Decimal('0.00')
+        for prenda_item in self.prendas.all():
+            gramos = prenda_item.prenda.gramos * prenda_item.cantidad
+            total += Decimal(str(gramos))
+        return total
 
-    def ganancia_total(self):
-        """Calcula la ganancia total en la venta"""
-        return self.total_gramos() * self.gramo_ganancia
+    def save(self, *args, **kwargs):
+        """Recalcular total antes de guardar"""
+        self.total = self.calcular_total()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        """Validaciones a nivel de modelo"""
+        # Validación XOR crítica: una venta NO puede tener crédito Y apartado
+        if self.credito and self.apartado:
+            raise ValidationError(
+                "Una venta no puede tener tanto crédito como apartado al mismo tiempo"
+            )
+        
+        if self.prendas.count() == 0:
+            raise ValidationError("La venta debe contener al menos una prenda")
 
     class Meta:
         verbose_name = "Venta"
@@ -183,64 +174,125 @@ class Venta(models.Model):
         ]
 
 class VentaPrenda(models.Model):
-    venta = models.ForeignKey(
-        "Venta", 
-        on_delete=models.CASCADE, 
-        related_name="prendas"
+    venta = models.ForeignKey("Venta", on_delete=models.CASCADE, related_name="prendas")
+    prenda = models.ForeignKey("prendas.Prenda", on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    precio_por_gramo = models.DecimalField(
+        max_digits=10, decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.01'))],
+        default=Decimal('0.00')
     )
-    prenda = models.ForeignKey(
-        "prendas.Prenda", 
-        on_delete=models.CASCADE
+    gramo_ganancia = models.DecimalField(
+        max_digits=8, decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0'))],
+        default=Decimal('0.1')
     )
-    cantidad = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)]
+    subtotal = models.DecimalField(
+        max_digits=12, decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.01'))],
+        editable=False, default=Decimal('0.00')
     )
 
-    def __str__(self):
-        return f"{self.venta} - {self.prenda} (Cant: {self.cantidad})"
-
-    def clean(self):
-        if self.cantidad <= 0:
-            raise ValidationError("La cantidad debe ser mayor que cero")
-        
-        # Verificar stock antes de vender
-        if not self.prenda.tiene_stock(self.cantidad):
-            raise ValidationError(
-                f"No hay suficiente stock. Disponible: {self.prenda.existencia}, "
-                f"Requerido: {self.cantidad}"
-            )
+    def calcular_subtotal(self):
+        """
+        Fórmula correcta:
+        subtotal = ((gramos_prenda + gramo_ganancia) * precio_por_gramo) * cantidad
+        """
+        peso_ajustado = self.prenda.gramos + self.gramo_ganancia
+        subtotal = (Decimal(str(peso_ajustado)) * self.precio_por_gramo) * self.cantidad
+        return subtotal
 
     def save(self, *args, **kwargs):
-        # Control automático de inventario
         is_new = self.pk is None
+        
+        # Recalcular subtotal con la fórmula correcta
+        self.subtotal = self.calcular_subtotal()
+        
         if is_new:
-            # Nueva venta - verificar y reducir stock
             if not self.prenda.tiene_stock(self.cantidad):
                 raise ValidationError(f"No hay suficiente stock para {self.prenda}")
             super().save(*args, **kwargs)
             self.prenda.existencia -= self.cantidad
-            self.prenda.save(update_fields=['existencia'])
         else:
-            # Actualización - calcular diferencia
             old_instance = VentaPrenda.objects.get(pk=self.pk)
             diferencia = self.cantidad - old_instance.cantidad
             if diferencia > 0 and not self.prenda.tiene_stock(diferencia):
                 raise ValidationError("No hay suficiente stock para aumentar la cantidad")
             super().save(*args, **kwargs)
             self.prenda.existencia -= diferencia
-            self.prenda.save(update_fields=['existencia'])
+        
+        self.prenda.save(update_fields=['existencia'])
+        self.venta.save()
 
     def delete(self, *args, **kwargs):
-        # Devolver stock al eliminar venta
         self.prenda.existencia += self.cantidad
         self.prenda.save(update_fields=['existencia'])
         super().delete(*args, **kwargs)
+        self.venta.save()
 
     def subtotal_gramos(self):
-        """Calcula el subtotal en gramos"""
+        """Total de gramos sin ajuste de ganancia"""
         return self.prenda.gramos * self.cantidad
 
     class Meta:
         verbose_name = "Venta Prenda"
         verbose_name_plural = "Ventas Prendas"
         unique_together = ['venta', 'prenda']
+
+
+class CompraPrenda(models.Model):
+    compra = models.ForeignKey("Compra", on_delete=models.CASCADE, related_name="prendas")
+    prenda = models.ForeignKey("prendas.Prenda", on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    precio_por_gramo = models.DecimalField(
+        max_digits=10, decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.01'))],
+        default=Decimal('0.00')
+    )
+    subtotal = models.DecimalField(
+        max_digits=12, decimal_places=2, 
+        validators=[MinValueValidator(Decimal('0.01'))],
+        editable=False, default=Decimal('0.00')
+    )
+
+    def calcular_subtotal(self):
+        """
+        Fórmula para compra:
+        subtotal = (gramos_prenda * precio_por_gramo) * cantidad
+        """
+        gramos_totales = self.prenda.gramos * self.cantidad
+        subtotal = Decimal(str(gramos_totales)) * self.precio_por_gramo
+        return subtotal
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        
+        # Recalcular subtotal
+        self.subtotal = self.calcular_subtotal()
+        
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            self.prenda.existencia += self.cantidad
+        else:
+            old_instance = CompraPrenda.objects.get(pk=self.pk)
+            diferencia = self.cantidad - old_instance.cantidad
+            self.prenda.existencia += diferencia
+        
+        self.prenda.save(update_fields=['existencia'])
+        self.compra.save()
+
+    def delete(self, *args, **kwargs):
+        self.prenda.existencia -= self.cantidad
+        self.prenda.save(update_fields=['existencia'])
+        super().delete(*args, **kwargs)
+        self.compra.save()
+
+    def subtotal_gramos(self):
+        """Total de gramos"""
+        return self.prenda.gramos * self.cantidad
+
+    class Meta:
+        verbose_name = "Compra Prenda"
+        verbose_name_plural = "Compras Prendas"
+        unique_together = ['compra', 'prenda']
