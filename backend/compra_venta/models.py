@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 
+
 class Compra(models.Model):
     proveedor = models.ForeignKey(
         "terceros.Proveedor", 
@@ -31,8 +32,10 @@ class Compra(models.Model):
         default=Decimal('0.00')
     )
 
+
     def __str__(self):
         return f"Compra - {self.proveedor.nombre} - ${self.total}"
+
 
     def calcular_total(self):
         """
@@ -48,20 +51,19 @@ class Compra(models.Model):
             total += prenda_item.subtotal
         return total
 
+
     def save(self, *args, **kwargs):
-        """Recalcular total antes de guardar"""
-        self.total = self.calcular_total()
+        """Solo guardar, sin calcular total aquí"""
+        # NO calcular el total en save() para evitar acceder a prendas sin ID
+        # El total será calculado y guardado en el serializer
         super().save(*args, **kwargs)
 
-    def clean(self):
-        """Validaciones a nivel de modelo"""
-        if self.prendas.count() == 0:
-            raise ValidationError("La compra debe contener al menos una prenda")
 
     class Meta:
         verbose_name = "Compra"
         verbose_name_plural = "Compras"
         ordering = ['-fecha']
+
 
 
 class Venta(models.Model):
@@ -98,8 +100,10 @@ class Venta(models.Model):
         default=Decimal('0.00')
     )
 
+
     def __str__(self):
         return f"Venta - {self.cliente.nombre} - ${self.total}"
+
 
     def calcular_total(self):
         """
@@ -114,6 +118,7 @@ class Venta(models.Model):
         for prenda_item in self.prendas.all():
             total += prenda_item.subtotal
         return total
+
 
     def calcular_ganancia_total(self):
         """
@@ -134,6 +139,7 @@ class Venta(models.Model):
             ganancia += ganancia_prenda
         return ganancia
 
+
     def total_gramos(self):
         """
         Calcula el total de gramos sin ajuste de ganancia.
@@ -145,10 +151,13 @@ class Venta(models.Model):
             total += Decimal(str(gramos))
         return total
 
+
     def save(self, *args, **kwargs):
-        """Recalcular total antes de guardar"""
-        self.total = self.calcular_total()
+        """Solo guardar, sin calcular total aquí"""
+        # NO calcular el total en save() para evitar acceder a prendas sin ID
+        # El total será calculado y guardado en el serializer
         super().save(*args, **kwargs)
+
 
     def clean(self):
         """Validaciones a nivel de modelo"""
@@ -157,9 +166,7 @@ class Venta(models.Model):
             raise ValidationError(
                 "Una venta no puede tener tanto crédito como apartado al mismo tiempo"
             )
-        
-        if self.prendas.count() == 0:
-            raise ValidationError("La venta debe contener al menos una prenda")
+
 
     class Meta:
         verbose_name = "Venta"
@@ -172,6 +179,7 @@ class Venta(models.Model):
                 name='venta_no_credito_y_apartado'
             ),
         ]
+
 
 class VentaPrenda(models.Model):
     venta = models.ForeignKey("Venta", on_delete=models.CASCADE, related_name="prendas")
@@ -193,6 +201,7 @@ class VentaPrenda(models.Model):
         editable=False, default=Decimal('0.00')
     )
 
+
     def calcular_subtotal(self):
         """
         Fórmula correcta:
@@ -201,6 +210,7 @@ class VentaPrenda(models.Model):
         peso_ajustado = self.prenda.gramos + self.gramo_ganancia
         subtotal = (Decimal(str(peso_ajustado)) * self.precio_por_gramo) * self.cantidad
         return subtotal
+
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -222,22 +232,27 @@ class VentaPrenda(models.Model):
             self.prenda.existencia -= diferencia
         
         self.prenda.save(update_fields=['existencia'])
-        self.venta.save()
+        # NO llamar a venta.save() aquí para evitar loop infinito
+        # El total se actualizará en el serializer
+
 
     def delete(self, *args, **kwargs):
         self.prenda.existencia += self.cantidad
         self.prenda.save(update_fields=['existencia'])
         super().delete(*args, **kwargs)
-        self.venta.save()
+        # NO llamar a venta.save() aquí
+
 
     def subtotal_gramos(self):
         """Total de gramos sin ajuste de ganancia"""
         return self.prenda.gramos * self.cantidad
 
+
     class Meta:
         verbose_name = "Venta Prenda"
         verbose_name_plural = "Ventas Prendas"
         unique_together = ['venta', 'prenda']
+
 
 
 class CompraPrenda(models.Model):
@@ -255,6 +270,7 @@ class CompraPrenda(models.Model):
         editable=False, default=Decimal('0.00')
     )
 
+
     def calcular_subtotal(self):
         """
         Fórmula para compra:
@@ -263,6 +279,7 @@ class CompraPrenda(models.Model):
         gramos_totales = self.prenda.gramos * self.cantidad
         subtotal = Decimal(str(gramos_totales)) * self.precio_por_gramo
         return subtotal
+
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -280,17 +297,21 @@ class CompraPrenda(models.Model):
             self.prenda.existencia += diferencia
         
         self.prenda.save(update_fields=['existencia'])
-        self.compra.save()
+        # NO llamar a compra.save() aquí para evitar loop infinito
+        # El total se actualizará en el serializer
+
 
     def delete(self, *args, **kwargs):
         self.prenda.existencia -= self.cantidad
         self.prenda.save(update_fields=['existencia'])
         super().delete(*args, **kwargs)
-        self.compra.save()
+        # NO llamar a compra.save() aquí
+
 
     def subtotal_gramos(self):
         """Total de gramos"""
         return self.prenda.gramos * self.cantidad
+
 
     class Meta:
         verbose_name = "Compra Prenda"
