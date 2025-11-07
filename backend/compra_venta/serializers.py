@@ -2,7 +2,9 @@ from rest_framework import serializers
 from .models import Compra, CompraPrenda, Venta, VentaPrenda
 
 
+
 # ============ SERIALIZERS DE RELACIONES INTERMEDIAS ============
+
 
 class CompraPrendaSerializer(serializers.ModelSerializer):
     """Serializer para CompraPrenda (detalle de compra)"""
@@ -14,6 +16,7 @@ class CompraPrendaSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+
     class Meta:
         model = CompraPrenda
         fields = [
@@ -21,6 +24,7 @@ class CompraPrendaSerializer(serializers.ModelSerializer):
             'cantidad', 'precio_por_gramo', 'subtotal_gramos', 'subtotal'
         ]
         read_only_fields = ['subtotal', 'subtotal_gramos']
+
 
 
 class VentaPrendaSerializer(serializers.ModelSerializer):
@@ -33,6 +37,7 @@ class VentaPrendaSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+
     class Meta:
         model = VentaPrenda
         fields = [
@@ -42,7 +47,9 @@ class VentaPrendaSerializer(serializers.ModelSerializer):
         read_only_fields = ['subtotal', 'subtotal_gramos']
 
 
+
 # ============ SERIALIZERS PRINCIPALES ============
+
 
 class CompraSerializer(serializers.ModelSerializer):
     """Serializer para lectura de Compra"""
@@ -51,6 +58,7 @@ class CompraSerializer(serializers.ModelSerializer):
     prendas = CompraPrendaSerializer(many=True, read_only=True)
     total_gramos = serializers.SerializerMethodField()
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
 
     class Meta:
         model = Compra
@@ -61,14 +69,17 @@ class CompraSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['fecha', 'total', 'total_gramos']
 
+
     def get_total_gramos(self, obj):
         """Calcula el total de gramos de la compra"""
         return sum(cp.prenda.gramos * cp.cantidad for cp in obj.prendas.all())
 
 
+
 class CompraCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer para creación y actualización de Compra"""
     prendas = CompraPrendaSerializer(many=True, required=True)
+
 
     class Meta:
         model = Compra
@@ -78,21 +89,31 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['fecha', 'total']
 
+
     def validate_prendas(self, value):
         """Validar que haya al menos una prenda"""
         if not value:
             raise serializers.ValidationError("La compra debe contener al menos una prenda.")
         return value
 
+
     def create(self, validated_data):
         """Crear compra con sus prendas asociadas"""
         prendas_data = validated_data.pop('prendas', [])
+        
+        # Crear la compra primero (sin total calculado aún)
         compra = Compra.objects.create(**validated_data)
         
+        # Crear todas las prendas (esto actualiza el stock)
         for prenda_data in prendas_data:
             CompraPrenda.objects.create(compra=compra, **prenda_data)
         
+        # Ahora calcular el total después de que todas las prendas existen
+        compra.total = compra.calcular_total()
+        compra.save(update_fields=['total'])
+        
         return compra
+
 
     def update(self, instance, validated_data):
         """Actualizar compra y sus prendas"""
@@ -109,8 +130,13 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
             
             for prenda_data in prendas_data:
                 CompraPrenda.objects.create(compra=instance, **prenda_data)
+            
+            # Recalcular total después de cambiar prendas
+            instance.total = instance.calcular_total()
+            instance.save(update_fields=['total'])
         
         return instance
+
 
 
 class VentaSerializer(serializers.ModelSerializer):
@@ -122,6 +148,7 @@ class VentaSerializer(serializers.ModelSerializer):
     ganancia_total = serializers.SerializerMethodField()
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
+
     class Meta:
         model = Venta
         fields = [
@@ -131,18 +158,22 @@ class VentaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['fecha', 'total', 'total_gramos', 'ganancia_total']
 
+
     def get_total_gramos(self, obj):
         """Calcula el total de gramos sin ajuste de ganancia"""
         return obj.total_gramos()
+
 
     def get_ganancia_total(self, obj):
         """Calcula la ganancia total de la venta"""
         return obj.calcular_ganancia_total()
 
 
+
 class VentaCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer para creación y actualización de Venta"""
     prendas = VentaPrendaSerializer(many=True, required=True)
+
 
     class Meta:
         model = Venta
@@ -152,6 +183,7 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['fecha', 'total']
 
+
     def validate(self, data):
         """Validar que no tenga crédito Y apartado simultáneamente"""
         if data.get('credito') and data.get('apartado'):
@@ -160,21 +192,31 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
             )
         return data
 
+
     def validate_prendas(self, value):
         """Validar que haya al menos una prenda"""
         if not value:
             raise serializers.ValidationError("La venta debe contener al menos una prenda.")
         return value
 
+
     def create(self, validated_data):
         """Crear venta con sus prendas asociadas"""
         prendas_data = validated_data.pop('prendas', [])
+        
+        # Crear la venta primero (sin total calculado aún)
         venta = Venta.objects.create(**validated_data)
         
+        # Crear todas las prendas (esto actualiza el stock)
         for prenda_data in prendas_data:
             VentaPrenda.objects.create(venta=venta, **prenda_data)
         
+        # Ahora calcular el total después de que todas las prendas existen
+        venta.total = venta.calcular_total()
+        venta.save(update_fields=['total'])
+        
         return venta
+
 
     def update(self, instance, validated_data):
         """Actualizar venta y sus prendas"""
@@ -191,5 +233,9 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
             
             for prenda_data in prendas_data:
                 VentaPrenda.objects.create(venta=instance, **prenda_data)
+            
+            # Recalcular total después de cambiar prendas
+            instance.total = instance.calcular_total()
+            instance.save(update_fields=['total'])
         
         return instance
