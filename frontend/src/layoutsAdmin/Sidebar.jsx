@@ -169,6 +169,17 @@ export default function Sidebar({
           >
             <FaCashRegister /> {!collapsed && "Caja"}
           </NavLink>
+          <NavLink
+            to="/admin/ventas"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                ? "bg-purple-600 text-white"
+                : "hover:bg-gray-700"
+              }`
+            }
+          >
+            <FaCashRegister /> {!collapsed && "Ventas"}
+          </NavLink>
         </nav>
       </aside>
     </>
