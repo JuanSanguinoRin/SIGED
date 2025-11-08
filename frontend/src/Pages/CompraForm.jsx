@@ -83,7 +83,7 @@ const CompraForm = () => {
     };
 
     try {
-      const response = await fetch(`${BASE_URL}compras/`, {
+      const response = await fetch(`${BASE_URL}compra_venta/compras/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
