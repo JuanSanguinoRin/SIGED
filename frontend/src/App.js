@@ -10,7 +10,7 @@ import DeudasCobrar from './Pages/DeudasCobrar';
 import DeudasPagar from './Pages/DeudasPagar';
 import Inventario from './Pages/Inventario';
 import Caja from './Pages/Caja';
-import Compra from './Pages/Compra';
+import CompraForm from './Pages/CompraForm';
 import Venta from './Pages/Venta';
 import './App.css';
 
@@ -32,7 +32,7 @@ function App() {
           <Route path="deudas/pagar" element={<DeudasPagar />} />
           <Route path="inventario" element={<Inventario />} />
           <Route path="caja" element={<Caja />} />
-          <Route path="compra" element={<Compra />} />
+          <Route path="compras" element={<CompraForm />} />
           <Route path="ventas" element={<Venta />} />
         </Route>
 
