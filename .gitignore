@@ -1,5 +1,6 @@
 # Entorno virtual
 venv/
+node_modules/
 
 # Archivos de caché de Python
 __pycache__/
