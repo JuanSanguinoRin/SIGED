@@ -2,9 +2,8 @@
 import { useEffect, useState } from "react";
 import ClientCard from "../Components/ClientCard";
 import ClientDetail from "../Components/ClientDetail";
-
 import ClientSearchBar from "../Components/ClientSearchBar";
-import EditClientModal from "../Components/EditClientModal";
+import ClientModal from "../Components/ClientModal"; // Renombrado y unificado
 
 
 const Clientes = () => {
@@ -14,11 +13,13 @@ const Clientes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalCliente, setModalCliente] = useState(null);
+  const [isCreating, setIsCreating] = useState(false); // 🔹 Nuevo: controlar modo
 
-  // 🔹 Cargar lista general al montar
+
   useEffect(() => {
     fetchClientes();
   }, []);
+
 
   const fetchClientes = async () => {
     try {
@@ -33,7 +34,7 @@ const Clientes = () => {
     }
   };
 
-  // 🔹 Buscar clientes (por cédula o nombre)
+
   const handleBuscar = async (termino) => {
     if (!termino) {
       fetchClientes();
@@ -43,17 +44,14 @@ const Clientes = () => {
     try {
       let url = "";
       if (/^\d+$/.test(termino)) {
-        // Si es numérico → búsqueda por cédula
         url = `http://127.0.0.1:8000/api/terceros/clientes/buscar_por_cedula/?cedula=${termino}`;
       } else {
-        // Si contiene letras → búsqueda por nombre
         url = `http://127.0.0.1:8000/api/terceros/clientes/buscar_por_nombre/?nombre=${termino}`;
       }
 
       const response = await fetch(url);
 
       if (response.status === 404) {
-        // Si el backend devuelve 404 → sin resultados
         setClientes([]);
         return;
       }
@@ -68,66 +66,112 @@ const Clientes = () => {
     }
   };
 
-  // 🔹 useEffect con debounce para búsqueda reactiva
+
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       handleBuscar(searchTerm);
-    }, 400); // espera 400 ms después de dejar de escribir
+    }, 400);
 
     return () => clearTimeout(delayDebounce);
   }, [searchTerm]);
 
-  // 🔹 Mostrar u ocultar detalle del cliente (acordeón)
-  const handleSelect = async (cliente) => {
-    if (selectedClient?.id === cliente.id) {
+
+  const handleSelect = async (clienteId) => {
+    if (selectedClient?.id === clienteId) {
       setSelectedClient(null);
       return;
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/terceros/clientes/${cliente.id}/`);
-      if (!response.ok) throw new Error("Error al obtener detalle del cliente");
-      const detalle = await response.json();
-      setSelectedClient(detalle);
+      const [detalleRes, ventasRes] = await Promise.all([
+        fetch(`http://127.0.0.1:8000/api/terceros/clientes/${clienteId}/`),
+        fetch(`http://127.0.0.1:8000/api/compra_venta/ventas/`),
+      ]);
+
+      if (!detalleRes.ok) throw new Error("Error al obtener detalle del cliente");
+      if (!ventasRes.ok) throw new Error("Error al obtener ventas");
+
+      const detalle = await detalleRes.json();
+      const ventas = await ventasRes.json();
+
+      const ventasCliente = ventas.filter((v) => v.cliente === clienteId);
+
+      setSelectedClient({
+        ...detalle,
+        historial: ventasCliente,
+      });
     } catch (err) {
-      console.error("Error cargando detalle:", err);
+      console.error(err);
+      alert("Error cargando detalle/historial");
     }
   };
 
-   // 🔹 Abrir modal de edición
+
+  // 🔹 Abrir modal para CREAR cliente
+  const handleCreateClick = () => {
+    setModalCliente({});
+    setIsCreating(true);
+  };
+
+
+  // 🔹 Abrir modal para EDITAR cliente
   const handleEdit = (cliente) => {
     setModalCliente(cliente);
+    setIsCreating(false);
   };
 
-  // 🔹 Guardar cambios del cliente (tras editar)
+
+  // 🔹 Guardar cliente (crear o actualizar)
   const handleSave = (clienteActualizado) => {
-    setClientes((prevClientes) =>
-      prevClientes.map((c) => (c.id === clienteActualizado.id ? clienteActualizado : c))
+    if (isCreating) {
+      // Crear nuevo cliente
+      setClientes((prev) => [...prev, clienteActualizado]);
+    } else {
+      // Actualizar cliente existente
+      setClientes((prev) =>
+        prev.map((c) => (c.id === clienteActualizado.id ? clienteActualizado : c))
+      );
+    }
+    setModalCliente(null);
+    setIsCreating(false);
+  };
+
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-gray-500">Cargando clientes...</p>
+      </div>
     );
-  };
+  }
 
-  const handleDelete = (id) => {
-    console.log("Eliminar cliente con ID:", id);
-  };
-
-  if (loading) return <p className="text-center text-gray-500">Cargando clientes...</p>;
-  if (error) return <p className="text-center text-red-500">Error: {error}</p>;
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500">Error: {error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6 text-gray-800">Clientes</h2>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Gestión de Clientes</h1>
+        <button
+          onClick={handleCreateClick}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center gap-2"
+        >
+          <span className="text-xl">+</span>
+          Crear Cliente
+        </button>
+      </div>
+      
+      <ClientSearchBar searchTerm={searchTerm} onSearch={setSearchTerm} />
 
-      {/* 🔍 Barra de búsqueda */}
-      <ClientSearchBar
-        searchTerm={searchTerm}
-        onSearch={setSearchTerm}
-      />
-
-      {/* 🔹 Lista de clientes */}
       {clientes.length === 0 ? (
-        <p className="text-center text-gray-500">No se encontraron clientes.</p>
+        <p className="text-center text-gray-500 mt-6">No se encontraron clientes.</p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 mt-6">
           {clientes.map((cliente) => (
             <div
               key={cliente.id}
@@ -136,21 +180,15 @@ const Clientes = () => {
               <ClientCard
                 cliente={cliente}
                 isOpen={selectedClient?.id === cliente.id}
-                onSelect={() => handleSelect(cliente)}
-                onEdit={handleEdit}  
-                onDelete={handleDelete}
+                onSelect={handleSelect}
+                onEdit={handleEdit}
               />
 
-              {/* Detalle del cliente debajo del card */}
               {selectedClient?.id === cliente.id && (
                 <div className="p-4 bg-white border-t border-gray-200 transition-all duration-500 ease-in-out">
                   <ClientDetail
                     cliente={selectedClient}
-                    resumen={{ totalCompras: 2500000, cantidadCompras: 5 }}
-                    historial={[
-                      { id: 1, producto: "Anillo de Oro", fecha: "2025-09-20", monto: 350000 },
-                      { id: 2, producto: "Pulsera de Plata", fecha: "2025-08-15", monto: 180000 },
-                    ]}
+                    historial={selectedClient.historial}
                   />
                 </div>
               )}
@@ -159,11 +197,15 @@ const Clientes = () => {
         </div>
       )}
 
-      {/* 🔹 Modal de edición */}
+      {/* 🔹 Modal unificado para crear y editar */}
       {modalCliente && (
-        <EditClientModal
+        <ClientModal
           cliente={modalCliente}
-          onClose={() => setModalCliente(null)}
+          isCreating={isCreating}
+          onClose={() => {
+            setModalCliente(null);
+            setIsCreating(false);
+          }}
           onSave={handleSave}
         />
       )}

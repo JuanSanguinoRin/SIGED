@@ -11,6 +11,7 @@ class Proveedor(models.Model):
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     fecha_registro = models.DateField(auto_now_add=True)
+    archivado = models.BooleanField(default=False)
 
     def __str__(self):
         return self.nombre
@@ -31,6 +32,7 @@ class Cliente(models.Model):
     email = models.EmailField(blank=True, null=True)
     cedula = models.CharField(max_length=20, unique=True)
     fecha_registro = models.DateField(auto_now_add=True)
+    archivado = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.nombre} - {self.cedula}"
