@@ -39,22 +39,38 @@ export default function Inventario() {
 const resumenPorOro = (tipoOro) => {
   const prendasOro = prendas.filter(p => p.tipo_oro_nombre === tipoOro);
 
-  const totalGramos = prendasOro
+  // gramos de prendas (normales: no chatarra ni recuperable)
+  const gramosPrendas = prendasOro
     .filter(p => !p.es_chatarra && !p.es_recuperable)
-    .reduce((acc, p) => acc + parseFloat(p.gramos || 0), 0);
+    .reduce((acc, p) => {
+      const gramos = parseFloat(p.gramos || 0);
+      const existencia = parseFloat(p.existencia || 0);
+      return acc + gramos * existencia;
+    }, 0);
 
   const gramosChatarra = prendasOro
     .filter(p => p.es_chatarra)
-    .reduce((acc, p) => acc + parseFloat(p.gramos || 0), 0);
+    .reduce((acc, p) => {
+      const gramos = parseFloat(p.gramos || 0);
+      const existencia = parseFloat(p.existencia || 0);
+      return acc + gramos * existencia;
+    }, 0);
 
   const gramosRecuperable = prendasOro
     .filter(p => p.es_recuperable)
-    .reduce((acc, p) => acc + parseFloat(p.gramos || 0), 0);
+    .reduce((acc, p) => {
+      const gramos = parseFloat(p.gramos || 0);
+      const existencia = parseFloat(p.existencia || 0);
+      return acc + gramos * existencia;
+    }, 0);
+
+  const total = gramosPrendas + gramosChatarra + gramosRecuperable;
 
   return {
-    total: totalGramos.toFixed(2),
+    prendas: gramosPrendas.toFixed(2),
     chatarra: gramosChatarra.toFixed(2),
     recuperable: gramosRecuperable.toFixed(2),
+    total: total.toFixed(2),
   };
 };
 
@@ -86,23 +102,29 @@ const nacional = resumenPorOro("NACIONAL");
     <div className="resumen-panel">
     <div className="resumen-caja italiano">
         <h3>Italiano</h3>
-        <p>Total gramos: {italiano.total}g</p>
-        <p>Chatarra: {italiano.chatarra}g</p>
-        <p>Recuperable: {italiano.recuperable}g</p>
+    <p>Total gramos: {italiano.total}g</p>
+  <p>Oro: {italiano.prendas}g</p>
+    <p>Chatarra: {italiano.chatarra}g</p>
+    <p>Recuperable: {italiano.recuperable}g</p>
     </div>
 
     <div className="resumen-caja nacional">
         <h3>Nacional</h3>
-        <p>Total gramos: {nacional.total}g</p>
-        <p>Chatarra: {nacional.chatarra}g</p>
-        <p>Recuperable: {nacional.recuperable}g</p>
+    <p>Total gramos: {nacional.total}g</p>
+  <p>Oro: {nacional.prendas}g</p>
+    <p>Chatarra: {nacional.chatarra}g</p>
+    <p>Recuperable: {nacional.recuperable}g</p>
     </div>
 
     <div className="resumen-caja general">
         <h3>General</h3>
         <p>Productos: {prendas.length}</p>
         <p>Gramos totales: {prendas
-        .reduce((acc, p) => acc + parseFloat(p.gramos || 0), 0)
+        .reduce((acc, p) => {
+          const gramos = parseFloat(p.gramos || 0);
+          const existencia = parseFloat(p.existencia || 0);
+          return acc + gramos * existencia;
+        }, 0)
         .toFixed(2)}g</p>
     </div>
 
@@ -174,9 +196,15 @@ const nacional = resumenPorOro("NACIONAL");
         <input
             type="checkbox"
             checked={filtros.chatarra}
-            onChange={(e) =>
-              setFiltros({ ...filtros, chatarra: e.target.checked })
-            }
+            onChange={(e) => {
+              const checked = e.target.checked;
+              // Evitar seleccionar ambos a la vez
+              if (checked && filtros.recuperable) {
+                alert("No puede seleccionar 'Chatarra' y 'Recuperable' al mismo tiempo.");
+                return;
+              }
+              setFiltros({ ...filtros, chatarra: checked });
+            }}
           />
     </div>
 
@@ -185,9 +213,15 @@ const nacional = resumenPorOro("NACIONAL");
         <input
             type="checkbox"
             checked={filtros.recuperable}
-            onChange={(e) =>
-              setFiltros({ ...filtros, recuperable: e.target.checked })
-            }
+            onChange={(e) => {
+              const checked = e.target.checked;
+              // Evitar seleccionar ambos a la vez
+              if (checked && filtros.chatarra) {
+                alert("No puede seleccionar 'Chatarra' y 'Recuperable' al mismo tiempo.");
+                return;
+              }
+              setFiltros({ ...filtros, recuperable: checked });
+            }}
           />
     </div>
     </div>
