@@ -7,6 +7,24 @@ import { IoMdArrowDropdown } from "react-icons/io";
 export default function Topbar({ onMobileMenuToggle }) {
   const [openMenu, setOpenMenu] = useState(false);
 
+  const handleLogout = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/auth/logout/", {
+        method: "POST",
+        credentials: "include", // necesario para borrar la sesión
+      });
+
+      if (response.ok) {
+        // Redirige al login
+        window.location.href = "/login";
+      } else {
+        console.error("Error al cerrar sesión");
+      }
+    } catch (error) {
+      console.error("Error de red:", error);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-gray-800 text-white shadow-md h-16">
       <div className="flex items-center justify-between px-6 py-3">
@@ -48,17 +66,14 @@ export default function Topbar({ onMobileMenuToggle }) {
             onClick={() => setOpenMenu(!openMenu)}
             className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors"
           >
-            <FaUserCircle className="text-2xl" />
-            <span className="text-sm">Usuario</span>
+            <span className="text-2xl">👩‍💻</span>
+            <span className="text-sm">Bienvenida Susana</span>
             <IoMdArrowDropdown className="text-xl" />
           </button>
 
           {openMenu && (
             <div className="absolute right-0 mt-2 w-40 bg-white text-[#2E2E2E] shadow-lg rounded-lg overflow-hidden z-50">
-              <button className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
-                Perfil
-              </button>
-              <button className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
+              <button onClick={handleLogout} className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
                 Cerrar sesión
               </button>
             </div>
