@@ -38,6 +38,7 @@
   display: flex;
   justify-content: space-around;
   margin-bottom: 1rem;
+ 
 }
 
 .modal-botones {
@@ -60,4 +61,120 @@
   border: none;
   border-radius: 6px;
   cursor: pointer;
+}
+
+
+
+
+
+
+.check-label {
+  padding: 10px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  
+}
+
+.check-label.gris {
+  background-color: #e0e0e0;
+  
+}
+
+.check-label.verde {
+  background-color: #c4f0c2;
+}
+
+.btn-agregar {
+  background: #6a4fb8;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+
+
+
+
+
+
+
+/* Centrado y espaciado */
+.form-producto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* Grupos de campos */
+.campo-grupo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Selects personalizados */
+.select-prenda,
+.select-oro {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  text-align: center;
+  font-weight: 500;
+  transition: 0.2s;
+}
+
+.select-prenda {
+  background-color: #e8d9ff; /* purpura pastel */
+  color: #4a2471;
+}
+
+.select-prenda:hover {
+  background-color: #e2cfff;
+}
+
+.select-oro {
+  background-color: #eee;
+  color: #333;
+}
+
+.select-oro.oro-nacional {
+  background-color: #d8e6ff; /* azul claro */
+  color: #214b8a;
+}
+
+.select-oro.oro-italiano {
+  background-color: #fff6b3; /* amarillo pastel */
+  color: #7a6600;
+}
+
+/* Nuevo tipo de prenda */
+.nuevo-tipo-grupo {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.nuevo-tipo-grupo input {
+  flex: 1;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+/* Espacio extra para botones inferiores */
+.modal-botones.espaciar {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
 }

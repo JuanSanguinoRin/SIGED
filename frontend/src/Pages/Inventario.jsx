@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import "../css/Inventario.css";
 import ModalEditar from "../Components/ModalEditar";
 import ModalArchivar from "../Components/ModalArchivar";
+import ModalAgregarProducto from "../Components/ModalAgregarProducto";
+import ModalArchivados from "../Components/ModalArchivados";
 
 export default function Inventario() {
   const [prendas, setPrendas] = useState([]);
@@ -15,6 +17,8 @@ export default function Inventario() {
 
   const [modalEditar, setModalEditar] = useState(null);
   const [modalArchivar, setModalArchivar] = useState(null);
+  const [mostrarAgregar, setMostrarAgregar] = useState(false);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
 
   // 🔹 Cargar datos desde API
   const cargarPrendas = async () => {
@@ -103,9 +107,23 @@ const nacional = resumenPorOro("NACIONAL");
     </div>
 
     <div className="panel-botones">
-        <button className="btn-archivados">📦 Archivados</button>
-        <button className="btn-agregar">+ Añadir Producto</button>
-    </div>
+        <button onClick={() => setMostrarArchivados(true)} className="btn-archivados">📦 Archivados</button>
+        <button onClick={() => setMostrarAgregar(true)} className="btn-agregar">+ Añadir Producto</button>
+
+        {mostrarAgregar && (
+          <ModalAgregarProducto
+            onClose={() => setMostrarAgregar(false)}
+            onAdd={() => window.location.reload()}
+          />
+        )}
+
+        {mostrarArchivados && (
+          <ModalArchivados
+            onClose={() => setMostrarArchivados(false)}
+            onRefresh={() => window.location.reload()}
+          />
+        )}
+            </div>
     </div>
 
 
