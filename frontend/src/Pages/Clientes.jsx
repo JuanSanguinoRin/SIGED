@@ -85,8 +85,9 @@ const Clientes = () => {
     try {
       const [detalleRes, ventasRes] = await Promise.all([
         fetch(`http://127.0.0.1:8000/api/terceros/clientes/${clienteId}/`),
-        fetch(`http://127.0.0.1:8000/api/compra_venta/ventas/`),
+        fetch(`http://127.0.0.1:8000/api/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`),
       ]);
+
 
       if (!detalleRes.ok) throw new Error("Error al obtener detalle del cliente");
       if (!ventasRes.ok) throw new Error("Error al obtener ventas");

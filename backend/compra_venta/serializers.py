@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Compra, CompraPrenda, Venta, VentaPrenda
+from django.db import transaction
 
 
 
@@ -201,20 +202,28 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
 
 
     def create(self, validated_data):
-        """Crear venta con sus prendas asociadas"""
         prendas_data = validated_data.pop('prendas', [])
-        
-        # Crear la venta primero (sin total calculado aún)
-        venta = Venta.objects.create(**validated_data)
-        
-        # Crear todas las prendas (esto actualiza el stock)
-        for prenda_data in prendas_data:
-            VentaPrenda.objects.create(venta=venta, **prenda_data)
-        
-        # Ahora calcular el total después de que todas las prendas existen
-        venta.total = venta.calcular_total()
-        venta.save(update_fields=['total'])
-        
+
+        with transaction.atomic():
+            venta = Venta.objects.create(**validated_data)
+
+            # Crear todas las prendas de una sola vez
+            prendas_objs = [
+                VentaPrenda(venta=venta, **p_data)
+                for p_data in prendas_data
+            ]
+            VentaPrenda.objects.bulk_create(prendas_objs)
+
+            # Actualizar existencias manualmente
+            for p in prendas_objs:
+                prenda = p.prenda
+                prenda.existencia -= p.cantidad
+                prenda.save(update_fields=['existencia'])
+
+            # Calcular total solo una vez
+            venta.total = venta.calcular_total()
+            venta.save(update_fields=['total'])
+
         return venta
 
 
