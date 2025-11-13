@@ -292,6 +292,18 @@ class VentaViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(ventas, many=True)
         return Response(serializer.data)
     
+    # compra_venta/views.py
+    @action(detail=False, methods=['get'], url_path='por-cliente-id')
+    def listar_por_cliente_id(self, request):
+        cliente_id = request.query_params.get('cliente_id')
+        if not cliente_id:
+            return Response({"error": "Debe proporcionar el parámetro cliente_id."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ventas = self.get_queryset().filter(cliente_id=cliente_id)
+        serializer = self.get_serializer(ventas, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    
         
     @action(detail=False, methods=['post'], url_path='crear-con-credito')
     def crear_con_credito(self, request):
