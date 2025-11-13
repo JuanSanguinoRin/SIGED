@@ -30,7 +30,7 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
       es_chatarra: esChatarra,
       es_recuperable: esRecuperable,
       gramos,
-      existencia,
+
       archivado: false,
     };
 
@@ -41,11 +41,12 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
     });
 
     if (res.ok) {
-      onAdd();
-      onClose();
-    } else {
-      const err = await res.json();
-      alert("Error: " + (err.error || "No se pudo guardar"));
+    const nuevaPrenda = await res.json();
+    onAdd(nuevaPrenda); // 🔹 enviamos la nueva prenda al padre
+    onClose();
+  } else {
+    const err = await res.json();
+    alert("Error: " + (err.error || "No se pudo guardar"));
     }
   };
 
@@ -165,13 +166,7 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
             required
           />
 
-          <input
-            type="number"
-            placeholder="Cantidad existente"
-            value={existencia}
-            onChange={(e) => setExistencia(e.target.value)}
-            required
-          />
+          
 
           <div className="modal-botones espaciar">
             <button type="button" className="btn-cancelar" onClick={onClose}>
