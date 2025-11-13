@@ -91,14 +91,14 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'defaultdb',
-        'USER': 'avnadmin',
-        'PASSWORD': os.getenv('DB_PASSWORD'),  # ← usa variable de entorno
-        'HOST': 'pg-67749f1-ufps-fd2a.l.aivencloud.com',
-        'PORT': '13485',
-        'OPTIONS': {'sslmode': 'require'},
+        'NAME': 'siged',
+        'USER': 'siged_user',
+        'PASSWORD': os.getenv('DB_PASSWORD'),  # o directamente la contraseña
+        'HOST': '149.130.174.61',
+        'PORT': '5432',
     }
 }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
