@@ -99,6 +99,17 @@ class CompraViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(compras, many=True)
         return Response(serializer.data)
+    
+    # compra_venta/views.py
+    @action(detail=False, methods=['get'], url_path='por-proveedor-id')
+    def listar_por_proveedor_id(self, request):
+        proveedor_id = request.query_params.get('proveedor_id')
+        if not proveedor_id:
+            return Response({"error": "Debe proporcionar proveedor_id."}, status=status.HTTP_400_BAD_REQUEST)
+        compras = self.get_queryset().filter(proveedor_id=proveedor_id)
+        serializer = self.get_serializer(compras, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     @action(detail=False, methods=['get'], url_path='buscar/por-proveedor')
     def buscar_por_proveedor(self, request):
