@@ -14,6 +14,14 @@ const CompraForm = () => {
 
   const BASE_URL = "http://127.0.0.1:8000/api/";
 
+  const [esCredito, setEsCredito] = useState(false);
+  const [creditoData, setCreditoData] = useState({
+    cantidad_cuotas: "",
+    interes: "",
+    estado: 4, // En proceso por defecto
+    fecha_limite: "",
+  });
+
   // --- Cargar datos iniciales ---
   useEffect(() => {
     const fetchData = async () => {
@@ -69,42 +77,66 @@ const CompraForm = () => {
 
   // --- Enviar compra al backend ---
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const payload = {
-      proveedor: selectedProveedor,
-      metodo_pago: selectedMetodoPago,
-      descripcion,
-      prendas: items.map((item) => ({
-        prenda: parseInt(item.prenda),
-        cantidad: parseInt(item.cantidad),
-        precio_por_gramo: parseFloat(item.precio_por_gramo),
-      })),
-    };
+  const payload = {
+    proveedor: selectedProveedor,
+    metodo_pago: selectedMetodoPago,
+    descripcion,
+    prendas: items.map((item) => ({
+      prenda: parseInt(item.prenda),
+      cantidad: parseInt(item.cantidad),
+      precio_por_gramo: parseFloat(item.precio_por_gramo),
+    })),
+  };
 
-    try {
-      const response = await fetch(`${BASE_URL}compra_venta/compras/`, {
+  try {
+    // 🔹 Si es crédito, crear el crédito primero
+    if (esCredito) {
+      const creditoRes = await fetch(`${BASE_URL}apartado_credito/creditos/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          cantidad_cuotas: Number(creditoData.cantidad_cuotas),
+          cuotas_pendientes: Number(creditoData.cantidad_cuotas),
+          interes: Number(creditoData.interes),
+          estado: 4,
+          fecha_limite: creditoData.fecha_limite,
+        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error:", errorData);
-        throw new Error("Error al registrar la compra");
-      }
-
-      setMensaje("✅ Compra registrada correctamente");
-      setSelectedProveedor("");
-      setSelectedMetodoPago("");
-      setDescripcion("");
-      setItems([{ prenda: "", cantidad: 1, precio_por_gramo: 0 }]);
-    } catch (error) {
-      setMensaje("❌ Error al registrar la compra");
-      console.error(error);
+      if (!creditoRes.ok) throw new Error("Error creando crédito");
+      const credito = await creditoRes.json();
+      payload.credito = credito.id;
     }
-  };
+
+    // 🔹 Crear la compra
+    const response = await fetch(`${BASE_URL}compra_venta/compras/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error:", errorData);
+      throw new Error("Error al registrar la compra");
+    }
+
+    setMensaje("✅ Compra registrada correctamente");
+    setSelectedProveedor("");
+    setSelectedMetodoPago("");
+    setDescripcion("");
+    setItems([{ prenda: "", cantidad: 1, precio_por_gramo: 0 }]);
+    setEsCredito(false);
+    setCreditoData({ cantidad_cuotas: "", interes: "", estado: 4, fecha_limite: "" });
+
+  } catch (error) {
+    setMensaje("❌ Error al registrar la compra");
+    console.error(error);
+  }
+};
+
 
   return (
     <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8 mt-10">
@@ -175,6 +207,76 @@ const CompraForm = () => {
             onChange={(e) => setDescripcion(e.target.value)}
           ></textarea>
         </div>
+
+        {/* Compra a crédito */}
+        <div className="mb-6">
+          <label className="inline-flex items-center">
+            <input
+              type="checkbox"
+              className="mr-2"
+              checked={esCredito}
+              onChange={(e) => setEsCredito(e.target.checked)}
+            />
+            Compra a crédito
+          </label>
+        </div>
+
+        {/* Configuración del crédito */}
+        {esCredito && (
+          <div className="border p-4 rounded-lg bg-gray-50 mb-6">
+            <h4 className="font-semibold text-gray-700 mb-3">Configuración del Crédito</h4>
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm text-gray-600">Cantidad de cuotas</label>
+                <input
+                  type="number"
+                  min="1"
+                  className="border p-2 rounded-md w-full"
+                  value={creditoData.cantidad_cuotas}
+                  onChange={(e) =>
+                    setCreditoData({ ...creditoData, cantidad_cuotas: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600">Interés (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="border p-2 rounded-md w-full"
+                  placeholder="Ej: 2.5"
+                  value={creditoData.interes}
+                  onChange={(e) =>
+                    setCreditoData({ ...creditoData, interes: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600">Estado</label>
+                <input
+                  type="text"
+                  className="border p-2 rounded-md w-full bg-gray-100 cursor-not-allowed"
+                  value="En proceso"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-600">Fecha límite</label>
+                <input
+                  type="date"
+                  className="border p-2 rounded-md w-full"
+                  value={creditoData.fecha_limite}
+                  onChange={(e) =>
+                    setCreditoData({ ...creditoData, fecha_limite: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabla de prendas */}
         <div>

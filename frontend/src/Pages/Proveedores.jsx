@@ -71,31 +71,39 @@ const Proveedores = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // 🔹 Obtener detalle + historial dinámico
-  const handleSelect = async (proveedor) => {
-    if (selectedProveedor?.id === proveedor.id) {
-      setSelectedProveedor(null);
-      return;
-    }
-    try {
-      const [detalleRes, comprasRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/terceros/proveedores/${proveedor.id}/`),
-        fetch(`http://127.0.0.1:8000/api/compra_venta/compras/`),
-      ]);
+  // 🔹 Obtener detalle del proveedor + historial de compras
+const handleSelect = async (proveedor) => {
+  // Si ya está seleccionado, lo deselecciona (colapsa la vista)
+  if (selectedProveedor?.id === proveedor.id) {
+    setSelectedProveedor(null);
+    return;
+  }
 
-      if (!detalleRes.ok) throw new Error("Error al obtener detalle del proveedor");
-      if (!comprasRes.ok) throw new Error("Error al obtener compras");
+  try {
+    // Cargar detalle del proveedor y su historial en paralelo
+    const [detalleRes, comprasRes] = await Promise.all([
+      fetch(`http://127.0.0.1:8000/api/terceros/proveedores/${proveedor.id}/`),
+      fetch(`http://127.0.0.1:8000/api/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedor.id}`)
+    ]);
 
-      const detalle = await detalleRes.json();
-      const compras = await comprasRes.json();
-      const comprasProveedor = compras.filter((c) => c.proveedor === proveedor.id);
+    // Validar respuestas HTTP
+    if (!detalleRes.ok) throw new Error("Error al obtener detalle del proveedor");
+    if (!comprasRes.ok) throw new Error("Error al obtener historial de compras");
 
-      setSelectedProveedor({ ...detalle, historial: comprasProveedor });
-    } catch (err) {
-      console.error(err);
-      alert("Error cargando detalle/historial");
-    }
-  };
+    // Convertir ambas respuestas a JSON
+    const detalle = await detalleRes.json();
+    const comprasProveedor = await comprasRes.json();
+
+    // Actualizar el estado con ambos resultados
+    setSelectedProveedor({
+      ...detalle,
+      historial: comprasProveedor,
+    });
+  } catch (err) {
+    console.error("❌ Error cargando detalle/historial:", err);
+    alert("Error cargando detalle o historial del proveedor.");
+  }
+};
 
   const handleEdit = (proveedor) => setModalProveedor(proveedor);
 

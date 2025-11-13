@@ -98,44 +98,66 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
+    @transaction.atomic
     def create(self, validated_data):
-        """Crear compra con sus prendas asociadas"""
+        """Crear compra y prendas asociadas en una sola transacción"""
         prendas_data = validated_data.pop('prendas', [])
-        
-        # Crear la compra primero (sin total calculado aún)
         compra = Compra.objects.create(**validated_data)
-        
-        # Crear todas las prendas (esto actualiza el stock)
-        for prenda_data in prendas_data:
-            CompraPrenda.objects.create(compra=compra, **prenda_data)
-        
-        # Ahora calcular el total después de que todas las prendas existen
+
+        # Preparar objetos CompraPrenda para inserción masiva
+        prendas_objs = [
+            CompraPrenda(compra=compra, **p_data)
+            for p_data in prendas_data
+        ]
+        CompraPrenda.objects.bulk_create(prendas_objs)
+
+        # Actualizar existencias de las prendas una sola vez
+        for p in prendas_objs:
+            prenda = p.prenda
+            prenda.existencia += p.cantidad
+            prenda.save(update_fields=['existencia'])
+
+        # Calcular total solo una vez
         compra.total = compra.calcular_total()
         compra.save(update_fields=['total'])
-        
         return compra
 
-
+    @transaction.atomic
     def update(self, instance, validated_data):
-        """Actualizar compra y sus prendas"""
+        """Actualizar compra y prendas asociadas eficientemente"""
         prendas_data = validated_data.pop('prendas', None)
-        
-        # Actualizar campos de la compra
+
+        # Actualizar campos simples
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Si se proporcionan prendas, reemplazarlas completamente
+        # Si se envían nuevas prendas, reemplazar las anteriores
         if prendas_data is not None:
+            # Revertir existencias de prendas antiguas
+            for p in instance.prendas.all():
+                prenda = p.prenda
+                prenda.existencia -= p.cantidad
+                prenda.save(update_fields=['existencia'])
             instance.prendas.all().delete()
-            
-            for prenda_data in prendas_data:
-                CompraPrenda.objects.create(compra=instance, **prenda_data)
-            
-            # Recalcular total después de cambiar prendas
+
+            # Crear nuevas prendas en bloque
+            nuevas_prendas = [
+                CompraPrenda(compra=instance, **p_data)
+                for p_data in prendas_data
+            ]
+            CompraPrenda.objects.bulk_create(nuevas_prendas)
+
+            # Sumar existencias nuevas
+            for p in nuevas_prendas:
+                prenda = p.prenda
+                prenda.existencia += p.cantidad
+                prenda.save(update_fields=['existencia'])
+
+            # Actualizar total
             instance.total = instance.calcular_total()
             instance.save(update_fields=['total'])
-        
+
         return instance
 
 
