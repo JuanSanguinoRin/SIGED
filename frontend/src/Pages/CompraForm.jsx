@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import ModalAgregarProducto from "../Components/ModalAgregarProducto";
+
 
 const CompraForm = () => {
   const [proveedores, setProveedores] = useState([]);
@@ -11,6 +13,8 @@ const CompraForm = () => {
     { prenda: "", cantidad: 1, precio_por_gramo: 0 },
   ]);
   const [mensaje, setMensaje] = useState(null);
+  const [mostrarModalPrenda, setMostrarModalPrenda] = useState(false);
+
 
   const BASE_URL = "http://127.0.0.1:8000/api/";
 
@@ -299,21 +303,31 @@ const CompraForm = () => {
                 return (
                   <tr key={index}>
                     <td className="border p-2">
-                      <select
-                        className="w-full border rounded p-1"
-                        value={item.prenda}
-                        onChange={(e) =>
-                          handleItemChange(index, "prenda", e.target.value)
-                        }
-                        required
-                      >
-                        <option value="">Seleccione</option>
-                        {prendas.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre} ({p.tipo_oro_nombre})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex-1 border rounded p-1"
+                          value={item.prenda}
+                          onChange={(e) => handleItemChange(index, "prenda", e.target.value)}
+                          required
+                        >
+                          <option value="">Seleccione</option>
+                          {prendas.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nombre} ({p.tipo_oro_nombre})
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* 🔹 Botón + */}
+                        <button
+                          type="button"
+                          onClick={() => setMostrarModalPrenda(true)}
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1 rounded-full text-lg leading-none"
+                          title="Agregar nueva prenda"
+                        >
+                          +
+                        </button>
+                      </div>
                     </td>
                     <td className="border p-2">
                       <input
@@ -381,6 +395,29 @@ const CompraForm = () => {
           </button>
         </div>
       </form>
+        {mostrarModalPrenda && (
+          <ModalAgregarProducto
+            onClose={() => setMostrarModalPrenda(false)}
+            onAdd={(nuevaPrenda) => {
+              // 🔹 Agregar la nueva prenda al listado actual
+              setPrendas((prev) => [...prev, nuevaPrenda]);
+
+              // 🔹 Actualizar automáticamente el select del último item
+              setItems((prev) => {
+                const updated = [...prev];
+                const lastIndex = updated.length - 1;
+                updated[lastIndex].prenda = nuevaPrenda.id;
+                return updated;
+              });
+
+              // 🔹 Cerrar el modal
+              setMostrarModalPrenda(false);
+            }}
+          />
+        )}
+
+
+
     </div>
   );
 };
