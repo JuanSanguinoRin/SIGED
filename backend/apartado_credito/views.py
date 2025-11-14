@@ -1,8 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from .models import Apartado, Credito, Cuota
 from .serializers import ApartadoSerializer, CreditoSerializer, CuotaSerializer
+from decimal import Decimal
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,9 +23,34 @@ class ApartadoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         try:
             serializer.is_valid(raise_exception=True)
-            serializer.save()
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            # Guardar instancia primero
+            apartado = serializer.save()
+
+            # Asignaciones automáticas según reglas de negocio:
+            # - cuotas_pendientes = cantidad_cuotas
+            try:
+                apartado.cuotas_pendientes = apartado.cantidad_cuotas
+            except Exception:
+                apartado.cuotas_pendientes = apartado.cuotas_pendientes
+
+            # - monto_total y monto_pendiente: si existe una Venta o Compra que haga referencia,
+            #   usar su total; si no, dejar en 0.00
+            from compra_venta.models import Venta
+            total_val = None
+            venta = Venta.objects.filter(apartado=apartado).first()
+            if venta:
+                total_val = venta.total
+            if total_val is None:
+                # mantener valor por defecto si no se encuentra venta
+                total_val = apartado.monto_total if apartado.monto_total is not None else Decimal('0.00')
+
+            apartado.monto_total = total_val
+            apartado.monto_pendiente = total_val
+            apartado.full_clean()
+            apartado.save()
+            return apartado
+        except (DjangoValidationError, DRFValidationError) as e:
+            return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         """Permitir actualizaciones parciales (PATCH)"""
@@ -34,8 +62,8 @@ class ApartadoViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (DjangoValidationError, DRFValidationError) as e:
+            return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CreditoViewSet(viewsets.ModelViewSet):
@@ -45,9 +73,35 @@ class CreditoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         try:
             serializer.is_valid(raise_exception=True)
-            serializer.save()
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            credito = serializer.save()
+
+            # cuotas_pendientes = cantidad_cuotas
+            try:
+                credito.cuotas_pendientes = credito.cantidad_cuotas
+            except Exception:
+                credito.cuotas_pendientes = credito.cuotas_pendientes
+
+            # monto_total y monto_pendiente si hay Venta o Compra referenciando
+            from compra_venta.models import Venta, Compra
+            total_val = None
+            venta = Venta.objects.filter(credito=credito).first()
+            if venta:
+                total_val = venta.total
+            else:
+                compra = Compra.objects.filter(credito=credito).first()
+                if compra:
+                    total_val = compra.total
+
+            if total_val is None:
+                total_val = credito.monto_total if credito.monto_total is not None else Decimal('0.00')
+
+            credito.monto_total = total_val
+            credito.monto_pendiente = total_val
+            credito.full_clean()
+            credito.save()
+            return credito
+        except (DjangoValidationError, DRFValidationError) as e:
+            return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', True)
@@ -58,8 +112,8 @@ class CreditoViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (DjangoValidationError, DRFValidationError) as e:
+            return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CuotaViewSet(viewsets.ModelViewSet):
@@ -69,9 +123,49 @@ class CuotaViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         try:
             serializer.is_valid(raise_exception=True)
-            serializer.save()
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            from django.db import transaction
+
+            with transaction.atomic():
+                cuota = serializer.save()
+
+                # Si la cuota pertenece a un crédito
+                if cuota.credito:
+                    credito = cuota.credito
+                    # disminuir cuotas_pendientes (sin bajar de 0)
+                    if credito.cuotas_pendientes is not None and credito.cuotas_pendientes > 0:
+                        credito.cuotas_pendientes = max(0, credito.cuotas_pendientes - 1)
+                    # disminuir monto_pendiente (sin bajar de 0)
+                    if credito.monto_pendiente is None:
+                        credito.monto_pendiente = credito.monto_total
+                    try:
+                        credito.monto_pendiente = max(Decimal('0.00'), credito.monto_pendiente - cuota.monto)
+                    except Exception:
+                        # Fallback: cast to Decimal
+                        credito.monto_pendiente = max(Decimal('0.00'), Decimal(str(credito.monto_pendiente)) - Decimal(str(cuota.monto)))
+                    credito.full_clean()
+                    credito.save()
+
+                # Si la cuota pertenece a un apartado
+                if cuota.apartado:
+                    apartado = cuota.apartado
+                    if apartado.cuotas_pendientes is not None and apartado.cuotas_pendientes > 0:
+                        apartado.cuotas_pendientes = max(0, apartado.cuotas_pendientes - 1)
+                    if apartado.monto_pendiente is None:
+                        apartado.monto_pendiente = apartado.monto_total
+                    try:
+                        apartado.monto_pendiente = max(Decimal('0.00'), apartado.monto_pendiente - cuota.monto)
+                    except Exception:
+                        apartado.monto_pendiente = max(Decimal('0.00'), Decimal(str(apartado.monto_pendiente)) - Decimal(str(cuota.monto)))
+                    apartado.full_clean()
+                    apartado.save()
+
+        except (DjangoValidationError, DRFValidationError) as e:
+            # Errores de validación: devolver mensaje amigable
+            return Response({"warning": e.detail if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            return Response({"warning": "Error de integridad en la base de datos: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"warning": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', True)
@@ -82,8 +176,8 @@ class CuotaViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (DjangoValidationError, DRFValidationError) as e:
+            return Response({"error": e.message if hasattr(e, 'message') else (e.detail if hasattr(e, 'detail') else str(e))}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DeudasPorClienteView(APIView):
