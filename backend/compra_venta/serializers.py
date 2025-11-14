@@ -246,6 +246,22 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
             venta.total = venta.calcular_total()
             venta.save(update_fields=['total'])
 
+            # Si la venta tiene crédito o apartado, inicializar montos en las entidades
+            if venta.credito:
+                venta.credito.monto_total = venta.total
+                venta.credito.monto_pendiente = venta.total
+                # asegurar cuotas_pendientes inicial si no se ha definido
+                if venta.credito.cuotas_pendientes is None:
+                    venta.credito.cuotas_pendientes = venta.credito.cantidad_cuotas
+                venta.credito.save()
+
+            if venta.apartado:
+                venta.apartado.monto_total = venta.total
+                venta.apartado.monto_pendiente = venta.total
+                if venta.apartado.cuotas_pendientes is None:
+                    venta.apartado.cuotas_pendientes = venta.apartado.cantidad_cuotas
+                venta.apartado.save()
+
         return venta
 
 

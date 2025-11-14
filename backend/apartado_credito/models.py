@@ -13,6 +13,17 @@ class Apartado(models.Model):
     cuotas_pendientes = models.PositiveIntegerField(
         validators=[MinValueValidator(0)]
     )
+    monto_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+    monto_pendiente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+    descripcion = models.TextField(blank=True, null=True)
     estado = models.ForeignKey(
         "dominios_comunes.Estado", 
         on_delete=models.RESTRICT
@@ -27,6 +38,8 @@ class Apartado(models.Model):
     def clean(self):
         if self.cuotas_pendientes > self.cantidad_cuotas:
             raise ValidationError("Las cuotas pendientes no pueden ser mayores que el total de cuotas")
+        if self.monto_pendiente > self.monto_total:
+            raise ValidationError("El monto pendiente no puede ser mayor que el monto total")
 
     def esta_vencido(self):
         """Verifica si el apartado está vencido"""
@@ -45,6 +58,10 @@ class Apartado(models.Model):
                 check=models.Q(cuotas_pendientes__lte=models.F('cantidad_cuotas')),
                 name='apartado_cuotas_pendientes_validas'
             ),
+            models.CheckConstraint(
+                check=models.Q(monto_pendiente__lte=models.F('monto_total')),
+                name='apartado_monto_pendiente_valid'
+            ),
         ]
 
 class Credito(models.Model):
@@ -54,6 +71,17 @@ class Credito(models.Model):
     cuotas_pendientes = models.PositiveIntegerField(
         validators=[MinValueValidator(0)]
     )
+    monto_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+    monto_pendiente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+    descripcion = models.TextField(blank=True, null=True)
     interes = models.DecimalField(
         max_digits=5, 
         decimal_places=2, 
@@ -78,6 +106,8 @@ class Credito(models.Model):
     def clean(self):
         if self.cuotas_pendientes > self.cantidad_cuotas:
             raise ValidationError("Las cuotas pendientes no pueden ser mayores que el total de cuotas")
+        if self.monto_pendiente > self.monto_total:
+            raise ValidationError("El monto pendiente no puede ser mayor que el monto total")
 
     def esta_vencido(self):
         """Verifica si el crédito está vencido"""
@@ -95,6 +125,10 @@ class Credito(models.Model):
             models.CheckConstraint(
                 check=models.Q(cuotas_pendientes__lte=models.F('cantidad_cuotas')),
                 name='credito_cuotas_pendientes_validas'
+            ),
+            models.CheckConstraint(
+                check=models.Q(monto_pendiente__lte=models.F('monto_total')),
+                name='credito_monto_pendiente_valid'
             ),
         ]
 
