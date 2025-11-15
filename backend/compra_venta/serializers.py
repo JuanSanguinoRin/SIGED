@@ -109,7 +109,9 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
             CompraPrenda(compra=compra, **p_data)
             for p_data in prendas_data
         ]
-        CompraPrenda.objects.bulk_create(prendas_objs)
+        for p_data in prendas_data:
+            prenda = CompraPrenda(compra=compra, **p_data)
+            prenda.save()
 
         # Actualizar existencias de las prendas una sola vez
         for p in prendas_objs:
@@ -230,11 +232,11 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
             venta = Venta.objects.create(**validated_data)
 
             # Crear todas las prendas de una sola vez
-            prendas_objs = [
-                VentaPrenda(venta=venta, **p_data)
-                for p_data in prendas_data
-            ]
-            VentaPrenda.objects.bulk_create(prendas_objs)
+            prendas_objs = []
+            for p_data in prendas_data:
+                prenda = VentaPrenda(venta=venta, **p_data)
+                prenda.save()  # ejecuta cálculo subtotal + actualiza stock
+                prendas_objs.append(prenda)
 
             # Actualizar existencias manualmente
             for p in prendas_objs:
