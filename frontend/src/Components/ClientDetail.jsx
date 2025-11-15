@@ -13,7 +13,7 @@ const ClientDetail = ({ cliente, historial }) => {
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 w-full">
       {/* Encabezado */}
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+      <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
         Detalles del Cliente
       </h2>
 
@@ -46,7 +46,7 @@ const ClientDetail = ({ cliente, historial }) => {
       </div>
 
       {/* Historial de compras */}
-      <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+      <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3 text-center">
         Historial de Compras
       </h3>
 
@@ -55,8 +55,8 @@ const ClientDetail = ({ cliente, historial }) => {
           {historial.map((venta) => (
             <div key={venta.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
               {/* Encabezado de cada venta */}
-              <div className="mb-3">
-                <h4 className="font-semibold text-gray-800 text-lg">
+              <div className="mb-3 bg-gray-800 px-4 py-2 rounded">
+                <h4 className="font-semibold text-white text-lg">
                   {venta.descripcion} — {venta.fecha}
                 </h4>
               </div>

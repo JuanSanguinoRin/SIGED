@@ -4,6 +4,11 @@ import ModalEditar from "../Components/ModalEditar";
 import ModalArchivar from "../Components/ModalArchivar";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
 import ModalArchivados from "../Components/ModalArchivados";
+import { FaBox, FaPlus, FaCheck, FaTimes } from "react-icons/fa";
+import { MdArchive, MdUnarchive } from "react-icons/md";
+import { TbEdit } from "react-icons/tb";
+
+
 
 export default function Inventario() {
   const [prendas, setPrendas] = useState([]);
@@ -129,9 +134,13 @@ const nacional = resumenPorOro("NACIONAL");
     </div>
 
     <div className="panel-botones">
-        <button onClick={() => setMostrarArchivados(true)} className="btn-archivados">📦 Archivados</button>
-        <button onClick={() => setMostrarAgregar(true)} className="btn-agregar">+ Añadir Producto</button>
+        <button onClick={() => setMostrarArchivados(true)} className="btn-archivados btn-flex">
+          <MdUnarchive size={19} /> <span>Archivados</span>
+        </button>
 
+        <button onClick={() => setMostrarAgregar(true)} className="btn-agregar btn-flex">
+          <FaPlus size={16} /> <span>Añadir Producto</span>
+        </button>
         {mostrarAgregar && (
           <ModalAgregarProducto
             onClose={() => setMostrarAgregar(false)}
@@ -251,20 +260,35 @@ const nacional = resumenPorOro("NACIONAL");
               <td className={p.existencia > 0 ? "cantidad-verde" : "cantidad-roja"}>
                 {p.existencia}
               </td>
-              <td>{p.es_chatarra ? "✅" : "❌"}</td>
-              <td>{p.es_recuperable ? "✅" : "❌"}</td>
               <td>
+                {p.es_chatarra ? (
+                  <FaCheck size={16} color="#0a9300" className="icon-verde" />
+                ) : (
+                  <FaTimes size={16} color="#c40000" className="icon-rojo" />
+                )}
+              </td>
+
+              <td>
+                {p.es_recuperable ? (
+                  <FaCheck size={16} color="#0a9300" className="icon-verde" />
+                ) : (
+                  <FaTimes size={16} color="#c40000" className="icon-rojo" />
+                )}
+              </td>
+
+              <td >
                 <button
-                  className="btn-editar"
+                  className="btn-editar btn-flex"
                   onClick={() => setModalEditar(p)}
                 >
-                  ✏️
+                  <TbEdit size={16} />
                 </button>
+
                 <button
-                  className="btn-archivar"
+                  className="btn-archivar btn-flex"
                   onClick={() => setModalArchivar(p)}
                 >
-                  📦
+                  <MdArchive size={19} />
                 </button>
               </td>
             </tr>

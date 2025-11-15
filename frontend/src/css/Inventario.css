@@ -194,3 +194,17 @@
   font-size: 1.2rem;
   cursor: pointer;
 }
+.btn-flex {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-editar,
+.btn-archivar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  margin: 0 4px; /* separación */
+}
