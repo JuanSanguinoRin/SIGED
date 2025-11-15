@@ -18,6 +18,7 @@ const DeudasCobrar = () => {
 
   const [abonoModal, setAbonoModal] = useState(null);
   const [metodosPago, setMetodosPago] = useState([]);
+  const [openClientId, setOpenClientId] = useState(null);
 
   useEffect(() => {
     fetchAllClientesAndFilter();
@@ -30,6 +31,20 @@ const DeudasCobrar = () => {
     }, 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
+
+  const getEstadoNombre = (estado) => {
+  if (!estado) return "";
+
+  // si ya es string
+  if (typeof estado === "string") return estado;
+
+  // si es objeto (como tu JSON)
+  if (typeof estado === "object") {
+    return estado.nombre || "";
+  }
+
+  return "";
+};
 
   const fetchMetodosPago = async () => {
   try {
@@ -60,7 +75,7 @@ const DeudasCobrar = () => {
       const filtrado = all
         .map((item) => {
           const deudasPendientes = item.deudas.filter((d) => {
-            const estadoNombre = d.estado?.nombre ?? "";
+            const estadoNombre = getEstadoNombre(d.estado);
             return estadoNombre.toLowerCase() !== "finalizado";
           });
           return { cliente: item.cliente, deudas: deudasPendientes };
@@ -111,7 +126,7 @@ const DeudasCobrar = () => {
       const filtrado = all
         .map((item) => {
           const deudasPendientes = item.deudas.filter((d) => {
-            const estadoNombre = d.estado?.nombre ?? "";
+            const estadoNombre = getEstadoNombre(d.estado);
             return estadoNombre.toLowerCase() !== "finalizado";
           });
           return { cliente: item.cliente, deudas: deudasPendientes };
@@ -286,7 +301,7 @@ const DeudasCobrar = () => {
             const nuevasDeudas = item.deudas.map((d) => {
               if (d.venta_id === deuda.venta_id && d.tipo === deuda.tipo) {
 
-                
+
                 const montoPendienteActual =
                   detalleActualizado?.monto_pendiente ??
                   (d.monto_pendiente != null ? Math.max(0, d.monto_pendiente - parsed) : null);
@@ -304,15 +319,8 @@ const DeudasCobrar = () => {
                     (d.cuotas_pendientes != null
                       ? Math.max(0, d.cuotas_pendientes - 1)
                       : null),
-                  monto_pendiente:
-                    detalleActualizado?.monto_pendiente ??
-                    (d.monto_pendiente != null
-                      ? Math.max(0, d.monto_pendiente - parsed)
-                      : null),
-                  estado:
-                    detalleActualizado?.estado_detalle ||
-                    detalleActualizado?.estado ||
-                    d.estado,
+                  monto_pendiente: montoPendienteActual,
+                  estado: estadoActualizado,
                 };
               }
               return d;
@@ -322,7 +330,7 @@ const DeudasCobrar = () => {
           .map((item) => ({
             ...item,
             deudas: item.deudas.filter(
-              (d) => (d.estado ?? "").toLowerCase() !== "finalizado"
+              (d) => getEstadoNombre(d.estado).toLowerCase() !== "finalizado"
             ),
           }))
           .filter((item) => item.deudas.length > 0)
@@ -387,16 +395,26 @@ const DeudasCobrar = () => {
               className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden"
             >
               <div className="p-4 flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-700">
-                    {cliente.nombre ||
-                      cliente.razon_social ||
-                      `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim()}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    CI/NIT:{" "}
-                    {cliente.cedula || cliente.identificacion || "N/A"}
-                  </p>
+                <div
+                  className="p-4 flex justify-between items-center cursor-pointer"
+                  onClick={() =>
+                    setOpenClientId(openClientId === cliente.id ? null : cliente.id)
+                  }
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-700">
+                      {cliente.nombre ||
+                        cliente.razon_social ||
+                        `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim()}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      CI/NIT: {cliente.cedula || cliente.identificacion || "N/A"}
+                    </p>
+                  </div>
+
+                  <div >
+                    {openClientId === cliente.id ? "▲" : "▼"}
+                  </div>
                 </div>
 
                 <div className="text-right">
@@ -406,7 +424,8 @@ const DeudasCobrar = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-white border-t border-gray-200">
+              {openClientId === cliente.id && (
+               <div className="p-4 bg-white border-t border-gray-200 transition-all duration-300">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {deudas.map((d) => (
                     <div
@@ -460,6 +479,7 @@ const DeudasCobrar = () => {
                   ))}
                 </div>
               </div>
+              )}
             </div>
           ))}
         </div>
