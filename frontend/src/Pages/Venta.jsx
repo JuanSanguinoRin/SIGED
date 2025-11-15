@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { FaMoneyBillWave } from "react-icons/fa";
+
 
 const VentaForm = () => {
     const [clientes, setClientes] = useState([]);
@@ -553,8 +555,9 @@ const handleSubmit = async (e) => {
                 <h3 className="text-lg font-semibold mb-2 text-gray-700">Totales</h3>
                 <p><strong>Total venta:</strong> ${totales.totalVenta.toFixed(2)}</p>
                 <p><strong>Ganancia total:</strong> ${totales.totalGanancia.toFixed(2)}</p>
-                <p className="mt-2 text-lg text-green-700 font-bold">
-                    💰 Total final: ${(totales.totalVenta + totales.totalGanancia).toFixed(2)}
+                <p className="mt-2 text-lg text-green-700 font-bold flex items-center gap-2">
+                    <FaMoneyBillWave size={18} />
+                    Total final: ${(totales.totalVenta + totales.totalGanancia).toFixed(2)}
                 </p>
             </div>
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FaUserCircle } from "react-icons/fa";
 import { IoMdArrowDropdown } from "react-icons/io";
+import { SlUserFemale } from "react-icons/sl";
+
 
 export default function Topbar({ onMobileMenuToggle }) {
   const [openMenu, setOpenMenu] = useState(false);
@@ -66,7 +67,7 @@ export default function Topbar({ onMobileMenuToggle }) {
             onClick={() => setOpenMenu(!openMenu)}
             className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors"
           >
-            <span className="text-2xl">👩‍💻</span>
+            <SlUserFemale className="text-2xl text-white" />
             <span className="text-sm">Bienvenida Susana</span>
             <IoMdArrowDropdown className="text-xl" />
           </button>
