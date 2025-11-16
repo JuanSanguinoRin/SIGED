@@ -394,34 +394,38 @@ const DeudasCobrar = () => {
               key={cliente.id}
               className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden"
             >
-              <div className="p-4 flex justify-between items-start">
-                <div
-                  className="p-4 flex justify-between items-center cursor-pointer"
+              <div className="p-4 flex justify-between items-center">
+
+                {/* Nombre + CI */}
+                <div className="cursor-pointer"
                   onClick={() =>
                     setOpenClientId(openClientId === cliente.id ? null : cliente.id)
                   }
                 >
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-700">
-                      {cliente.nombre ||
-                        cliente.razon_social ||
-                        `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim()}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      CI/NIT: {cliente.cedula || cliente.identificacion || "N/A"}
-                    </p>
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700">
+                    {cliente.nombre ||
+                      cliente.razon_social ||
+                      `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim()}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    CI/NIT: {cliente.cedula || cliente.identificacion || "N/A"}
+                  </p>
+                </div>
 
-                  <div >
+                {/* Deudas + Flecha a la derecha */}
+                <div className="text-right cursor-pointer"
+                  onClick={() =>
+                    setOpenClientId(openClientId === cliente.id ? null : cliente.id)
+                  }
+                >
+                  <p className="text-sm text-gray-500">
+                    Deudas: <span className="font-semibold">{deudas.length}</span>
+                  </p>
+                  <div className="text-lg">
                     {openClientId === cliente.id ? "▲" : "▼"}
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">
-                    Deudas: <span className="font-semibold">{deudas.length}</span>
-                  </p>
-                </div>
               </div>
 
               {openClientId === cliente.id && (
