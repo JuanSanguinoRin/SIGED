@@ -33,18 +33,18 @@ const DeudasCobrar = () => {
   }, [searchTerm]);
 
   const getEstadoNombre = (estado) => {
-  if (!estado) return "";
+    if (!estado) return "";
 
-  // si ya es string
-  if (typeof estado === "string") return estado;
+    // si ya es string
+    if (typeof estado === "string") return estado;
 
-  // si es objeto (como tu JSON)
-  if (typeof estado === "object") {
-    return estado.nombre || "";
-  }
+    // si es objeto (como tu JSON)
+    if (typeof estado === "object") {
+      return estado.nombre || "";
+    }
 
-  return "";
-};
+    return "";
+  };
 
   const fetchMetodosPago = async () => {
   try {
@@ -165,9 +165,9 @@ const DeudasCobrar = () => {
                 cuotas_pendientes: crédito.cuotas_pendientes,
                 fecha_limite: crédito.fecha_limite,
                 estado:
-                  crédito.estado_detalle ||
-                  crédito.estado ||
-                  String(crédito.estado_nombre || ""),
+                  getEstadoNombre(crédito.estado_detalle) ||
+                  getEstadoNombre(crédito.estado) ||
+                  getEstadoNombre(crédito.estado_nombre),
                 credito_id: crédito.id,
                 monto_pendiente: crédito.monto_pendiente ?? null,
               };
@@ -198,9 +198,9 @@ const DeudasCobrar = () => {
                 cuotas_pendientes: apartado.cuotas_pendientes,
                 fecha_limite: apartado.fecha_limite,
                 estado:
-                  apartado.estado_detalle ||
-                  apartado.estado ||
-                  String(apartado.estado_nombre || ""),
+                  getEstadoNombre(apartado.estado_detalle) ||
+                  getEstadoNombre(apartado.estado) ||
+                  getEstadoNombre(apartado.estado_nombre),
                 apartado_id: apartado.id,
                 monto_pendiente: apartado.monto_pendiente ?? null,
               };
