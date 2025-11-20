@@ -78,89 +78,69 @@ class CompraSerializer(serializers.ModelSerializer):
 
 
 class CompraCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer para creación y actualización de Compra"""
     prendas = CompraPrendaSerializer(many=True, required=True)
-
 
     class Meta:
         model = Compra
         fields = [
-            'id', 'proveedor', 'credito', 'metodo_pago', 
+            'id', 'proveedor', 'credito', 'metodo_pago',
             'fecha', 'descripcion', 'total', 'prendas'
         ]
         read_only_fields = ['fecha', 'total']
 
-
     def validate_prendas(self, value):
-        """Validar que haya al menos una prenda"""
         if not value:
             raise serializers.ValidationError("La compra debe contener al menos una prenda.")
         return value
 
-
     @transaction.atomic
     def create(self, validated_data):
-        """Crear compra y prendas asociadas en una sola transacción"""
         prendas_data = validated_data.pop('prendas', [])
+
         compra = Compra.objects.create(**validated_data)
 
-        # Preparar objetos CompraPrenda para inserción masiva
-        prendas_objs = [
-            CompraPrenda(compra=compra, **p_data)
-            for p_data in prendas_data
-        ]
+        # Crear prendas (YA actualizan stock dentro de save)
         for p_data in prendas_data:
-            prenda = CompraPrenda(compra=compra, **p_data)
-            prenda.save()
+            CompraPrenda.objects.create(compra=compra, **p_data)
 
-        # Actualizar existencias de las prendas una sola vez
-        for p in prendas_objs:
-            prenda = p.prenda
-            prenda.existencia += p.cantidad
-            prenda.save(update_fields=['existencia'])
-
-        # Calcular total solo una vez
+        # Calcular total
         compra.total = compra.calcular_total()
         compra.save(update_fields=['total'])
-        return compra
 
+        return compra
+    
     @transaction.atomic
     def update(self, instance, validated_data):
-        """Actualizar compra y prendas asociadas eficientemente"""
         prendas_data = validated_data.pop('prendas', None)
 
-        # Actualizar campos simples
+        # actualizar campos simples
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Si se envían nuevas prendas, reemplazar las anteriores
+        # actualizar prendas si vienen nuevas
         if prendas_data is not None:
-            # Revertir existencias de prendas antiguas
-            for p in instance.prendas.all():
-                prenda = p.prenda
-                prenda.existencia -= p.cantidad
-                prenda.save(update_fields=['existencia'])
+
+            # eliminar prendas anteriores (su delete ya revierte stock)
             instance.prendas.all().delete()
 
-            # Crear nuevas prendas en bloque
-            nuevas_prendas = [
-                CompraPrenda(compra=instance, **p_data)
-                for p_data in prendas_data
-            ]
-            CompraPrenda.objects.bulk_create(nuevas_prendas)
+            # crear nuevas
+            for p_data in prendas_data:
+                CompraPrenda.objects.create(compra=instance, **p_data)
 
-            # Sumar existencias nuevas
-            for p in nuevas_prendas:
-                prenda = p.prenda
-                prenda.existencia += p.cantidad
-                prenda.save(update_fields=['existencia'])
+        # recalcular total
+        instance.total = instance.calcular_total()
+        instance.save(update_fields=['total'])
 
-            # Actualizar total
-            instance.total = instance.calcular_total()
-            instance.save(update_fields=['total'])
+        # si es compra a crédito, actualizar el crédito
+        if instance.credito:
+            instance.credito.monto_total = instance.total
+            instance.credito.monto_pendiente = instance.total
+            instance.credito.save()
 
         return instance
+
+
 
 
 
@@ -196,9 +176,7 @@ class VentaSerializer(serializers.ModelSerializer):
 
 
 class VentaCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer para creación y actualización de Venta"""
     prendas = VentaPrendaSerializer(many=True, required=True)
-
 
     class Meta:
         model = Venta
@@ -208,63 +186,34 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['fecha', 'total']
 
-
     def validate(self, data):
-        """Validar que no tenga crédito Y apartado simultáneamente"""
         if data.get('credito') and data.get('apartado'):
             raise serializers.ValidationError(
                 "Una venta no puede tener tanto crédito como apartado al mismo tiempo."
             )
         return data
 
-
     def validate_prendas(self, value):
-        """Validar que haya al menos una prenda"""
         if not value:
             raise serializers.ValidationError("La venta debe contener al menos una prenda.")
         return value
 
-
+    @transaction.atomic
     def create(self, validated_data):
         prendas_data = validated_data.pop('prendas', [])
 
-        with transaction.atomic():
-            venta = Venta.objects.create(**validated_data)
+        venta = Venta.objects.create(**validated_data)
 
-            # Crear todas las prendas de una sola vez
-            prendas_objs = []
-            for p_data in prendas_data:
-                prenda = VentaPrenda(venta=venta, **p_data)
-                prenda.save()  # ejecuta cálculo subtotal + actualiza stock
-                prendas_objs.append(prenda)
+        # Crear prendas (YA actualizan stock dentro de save)
+        for p_data in prendas_data:
+            VentaPrenda.objects.create(venta=venta, **p_data)
 
-            # Actualizar existencias manualmente
-            for p in prendas_objs:
-                prenda = p.prenda
-                prenda.existencia -= p.cantidad
-                prenda.save(update_fields=['existencia'])
-
-            # Calcular total solo una vez
-            venta.total = venta.calcular_total()
-            venta.save(update_fields=['total'])
-
-            # Si la venta tiene crédito o apartado, inicializar montos en las entidades
-            if venta.credito:
-                venta.credito.monto_total = venta.total
-                venta.credito.monto_pendiente = venta.total
-                # asegurar cuotas_pendientes inicial si no se ha definido
-                if venta.credito.cuotas_pendientes is None:
-                    venta.credito.cuotas_pendientes = venta.credito.cantidad_cuotas
-                venta.credito.save()
-
-            if venta.apartado:
-                venta.apartado.monto_total = venta.total
-                venta.apartado.monto_pendiente = venta.total
-                if venta.apartado.cuotas_pendientes is None:
-                    venta.apartado.cuotas_pendientes = venta.apartado.cantidad_cuotas
-                venta.apartado.save()
+        # Calcular total una sola vez
+        venta.total = venta.calcular_total()
+        venta.save(update_fields=['total'])
 
         return venta
+
 
 
     def update(self, instance, validated_data):

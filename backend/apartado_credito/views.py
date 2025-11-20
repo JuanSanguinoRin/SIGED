@@ -6,6 +6,7 @@ from django.db import IntegrityError
 from .models import Apartado, Credito, Cuota
 from .serializers import ApartadoSerializer, CreditoSerializer, CuotaSerializer
 from decimal import Decimal
+from django.db import transaction  # ← Agregar esta línea al inicio
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -64,6 +65,18 @@ class ApartadoViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except (DjangoValidationError, DRFValidationError) as e:
             return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        apartado = self.get_object()
+
+        try:
+            with transaction.atomic():
+                apartado.cancelar()
+            return Response({"message": "Apartado cancelado correctamente"}, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
 
 class CreditoViewSet(viewsets.ModelViewSet):
@@ -114,11 +127,37 @@ class CreditoViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except (DjangoValidationError, DRFValidationError) as e:
             return Response({"warning": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+    @action(detail=True, methods=['post'])
+    def cancelar(self, request, pk=None):
+        credito = self.get_object() 
+
+        try:
+            with transaction.atomic():
+                credito.cancelar()
+            return Response({"message": "Crédito cancelado correctamente"}, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
 
 class CuotaViewSet(viewsets.ModelViewSet):
     queryset = Cuota.objects.all()
     serializer_class = CuotaSerializer
+
+    def get_queryset(self):
+        """Permitir filtrar cuotas por crédito o apartado"""
+        queryset = super().get_queryset()
+        credito_id = self.request.query_params.get('credito', None)
+        apartado_id = self.request.query_params.get('apartado', None)
+        
+        if credito_id:
+            queryset = queryset.filter(credito_id=credito_id)
+        if apartado_id:
+            queryset = queryset.filter(apartado_id=apartado_id)
+            
+        return queryset.order_by('-fecha')
 
     def perform_create(self, serializer):
         try:
@@ -142,6 +181,11 @@ class CuotaViewSet(viewsets.ModelViewSet):
                     except Exception:
                         # Fallback: cast to Decimal
                         credito.monto_pendiente = max(Decimal('0.00'), Decimal(str(credito.monto_pendiente)) - Decimal(str(cuota.monto)))
+                    
+                    # ✅ CAMBIAR ESTADO A FINALIZADO SI MONTO PENDIENTE = 0
+                    if credito.monto_pendiente == Decimal('0.00'):
+                        credito.estado_id = 1  # ID del estado "Finalizado"
+                    
                     credito.full_clean()
                     credito.save()
 
@@ -156,6 +200,11 @@ class CuotaViewSet(viewsets.ModelViewSet):
                         apartado.monto_pendiente = max(Decimal('0.00'), apartado.monto_pendiente - cuota.monto)
                     except Exception:
                         apartado.monto_pendiente = max(Decimal('0.00'), Decimal(str(apartado.monto_pendiente)) - Decimal(str(cuota.monto)))
+                    
+                    # ✅ CAMBIAR ESTADO A FINALIZADO SI MONTO PENDIENTE = 0
+                    if apartado.monto_pendiente == Decimal('0.00'):
+                        apartado.estado_id = 1  # ID del estado "Finalizado"
+                    
                     apartado.full_clean()
                     apartado.save()
 
@@ -178,7 +227,6 @@ class CuotaViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         except (DjangoValidationError, DRFValidationError) as e:
             return Response({"error": e.message if hasattr(e, 'message') else (e.detail if hasattr(e, 'detail') else str(e))}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class DeudasPorClienteView(APIView):
     """

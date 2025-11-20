@@ -10,7 +10,8 @@ function SmallSpinner() {
 // Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
   const getEstadoConfig = (estadoNombre) => {
-    const nombre = estadoNombre?.toLowerCase() || "";
+    // Convertir a string si es necesario
+    const nombre = String(estadoNombre || "").toLowerCase();
     if (nombre === "finalizado") return { color: "bg-gray-100 text-gray-700", text: "Finalizado" };
     if (nombre === "en proceso") return { color: "bg-green-100 text-green-700", text: "En Proceso" };
     if (nombre === "cancelado") return { color: "bg-red-100 text-red-700", text: "Cancelado" };
@@ -37,11 +38,26 @@ const DeudasCobrar = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [openClientId, setOpenClientId] = useState(null);
   const [openDeudaId, setOpenDeudaId] = useState(null);
+  
+  // Estado para el filtro activo
+  const [filtroEstado, setFiltroEstado] = useState("En Proceso");
 
   const getEstadoNombre = (estado) => {
     if (!estado) return "";
     if (typeof estado === "string") return estado;
     if (typeof estado === "object") return estado.nombre || "";
+    
+    // Si es un número (ID), convertirlo al nombre
+    if (typeof estado === "number") {
+      const estadosMap = {
+        1: "Finalizado",
+        3: "Cancelado",
+        4: "En Proceso",
+        5: "Caducado"
+      };
+      return estadosMap[estado] || "";
+    }
+    
     return "";
   };
 
@@ -74,7 +90,8 @@ const DeudasCobrar = () => {
         .map((item) => {
           const deudasPendientes = item.deudas.filter((d) => {
             const estadoNombre = getEstadoNombre(d.estado);
-            return estadoNombre.toLowerCase() !== "finalizado";
+            // Filtrar por el estado seleccionado
+            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
           });
           return { cliente: item.cliente, deudas: deudasPendientes };
         })
@@ -123,7 +140,8 @@ const DeudasCobrar = () => {
         .map((item) => {
           const deudasPendientes = item.deudas.filter((d) => {
             const estadoNombre = getEstadoNombre(d.estado);
-            return estadoNombre.toLowerCase() !== "finalizado";
+            // Filtrar por el estado seleccionado
+            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
           });
           return { cliente: item.cliente, deudas: deudasPendientes };
         })
@@ -154,6 +172,13 @@ const DeudasCobrar = () => {
               );
               if (!det.ok) throw new Error("no detalle credito");
               const crédito = await det.json();
+
+              // Obtener cuotas/abonos del crédito
+              const cuotasRes = await fetch(
+                `${API_BASE}/api/apartado_credito/cuotas/?credito=${creditoId}`
+              );
+              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
+
               return {
                 venta_id: v.id,
                 venta: v,
@@ -170,6 +195,7 @@ const DeudasCobrar = () => {
                 cantidad_cuotas: crédito.cantidad_cuotas,
                 interes: crédito.interes,
                 descripcion: crédito.descripcion,
+                abonos: cuotas,
               };
             } catch (e) {
               return {
@@ -182,6 +208,7 @@ const DeudasCobrar = () => {
                 estado: v.credito?.estado || null,
                 credito_id: creditoId,
                 monto_pendiente: v.credito?.monto_pendiente ?? null,
+                abonos: [],
               };
             }
           } else if (v.apartado) {
@@ -192,6 +219,13 @@ const DeudasCobrar = () => {
               );
               if (!det.ok) throw new Error("no detalle apartado");
               const apartado = await det.json();
+
+              // Obtener cuotas/abonos del apartado
+              const cuotasRes = await fetch(
+                `${API_BASE}/api/apartado_credito/cuotas/?apartado=${apartadoId}`
+              );
+              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
+
               return {
                 venta_id: v.id,
                 venta: v,
@@ -207,6 +241,7 @@ const DeudasCobrar = () => {
                 monto_pendiente: apartado.monto_pendiente ?? null,
                 cantidad_cuotas: apartado.cantidad_cuotas,
                 descripcion: apartado.descripcion,
+                abonos: cuotas,
               };
             } catch (e) {
               return {
@@ -219,6 +254,7 @@ const DeudasCobrar = () => {
                 estado: v.apartado?.estado ?? null,
                 apartado_id: apartadoId,
                 monto_pendiente: v.apartado?.monto_pendiente ?? null,
+                abonos: [],
               };
             }
           } else {
@@ -300,6 +336,20 @@ const DeudasCobrar = () => {
         detalleActualizado = det.ok ? await det.json() : null;
       }
 
+      // Obtener cuotas actualizadas
+      let cuotasActualizadas = [];
+      if (deuda.credito_id) {
+        const cuotasRes = await fetch(
+          `${API_BASE}/api/apartado_credito/cuotas/?credito=${deuda.credito_id}`
+        );
+        cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
+      } else if (deuda.apartado_id) {
+        const cuotasRes = await fetch(
+          `${API_BASE}/api/apartado_credito/cuotas/?apartado=${deuda.apartado_id}`
+        );
+        cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
+      }
+
       // Actualizar el estado local
       setClientesConDeuda((prev) =>
         prev
@@ -311,13 +361,12 @@ const DeudasCobrar = () => {
                   detalleActualizado?.monto_pendiente ??
                   (d.monto_pendiente != null ? Math.max(0, d.monto_pendiente - parsed) : null);
 
-                // Cambiar estado a "Finalizado" si el monto pendiente es 0
-                const estadoActualizado =
-                  montoPendienteActual === 0 || montoPendienteActual === "0.00"
-                    ? "Finalizado"
-                    : (detalleActualizado?.estado_detalle ||
-                      detalleActualizado?.estado ||
-                      d.estado);
+                // Obtener el estado actualizado del backend
+                const estadoActualizado = getEstadoNombre(
+                  detalleActualizado?.estado_detalle ||
+                  detalleActualizado?.estado ||
+                  d.estado
+                );
 
                 return {
                   ...d,
@@ -328,6 +377,7 @@ const DeudasCobrar = () => {
                       : null),
                   monto_pendiente: montoPendienteActual,
                   estado: estadoActualizado,
+                  abonos: cuotasActualizadas, // ← Actualizar historial de abonos
                 };
               }
               return d;
@@ -336,9 +386,11 @@ const DeudasCobrar = () => {
           })
           .map((item) => ({
             ...item,
-            deudas: item.deudas.filter(
-              (d) => getEstadoNombre(d.estado).toLowerCase() !== "finalizado"
-            ),
+            deudas: item.deudas.filter((d) => {
+              const estadoNombre = getEstadoNombre(d.estado);
+              // Filtrar por el estado seleccionado actualmente
+              return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
+            }),
           }))
           .filter((item) => item.deudas.length > 0)
       );
@@ -357,13 +409,55 @@ const DeudasCobrar = () => {
 
   const handleCancelarDeuda = async (cliente, deuda) => {
     // eslint-disable-next-line no-restricted-globals
-    if (!confirm("¿Está seguro de cancelar esta deuda? Esta acción no se puede deshacer.")) {
+    if (!confirm(`¿Está seguro de cancelar esta deuda?\n\nTipo: ${deuda.tipo}\nVenta #${deuda.venta_id}\n\nEl dinero pagado no será reembolsable y el inventario será restaurado.`)) {
       return;
     }
 
-    // TODO: Implementar la lógica de cancelación
-    // Por ahora solo mostramos un mensaje
-    alert("Funcionalidad de cancelación en desarrollo");
+    try {
+      let url = "";
+      if (deuda.credito_id) {
+        url = `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/cancelar/`;
+      } else if (deuda.apartado_id) {
+        url = `${API_BASE}/api/apartado_credito/apartados/${deuda.apartado_id}/cancelar/`;
+      } else {
+        alert("Error: No se pudo identificar el tipo de deuda");
+        return;
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const msg = (err && (err.error || err.detail || JSON.stringify(err))) || `Error ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      
+      // Actualizar la lista local eliminando la deuda cancelada
+      setClientesConDeuda((prev) =>
+        prev
+          .map((item) => {
+            if (item.cliente.id !== cliente.id) return item;
+            
+            // Filtrar la deuda cancelada
+            const deudasActualizadas = item.deudas.filter(
+              (d) => !(d.venta_id === deuda.venta_id && d.tipo === deuda.tipo)
+            );
+            
+            return { ...item, deudas: deudasActualizadas };
+          })
+          .filter((item) => item.deudas.length > 0)
+      );
+
+      alert(data.message || "Deuda cancelada correctamente. El inventario ha sido restaurado.");
+    } catch (err) {
+      console.error("Error al cancelar deuda:", err);
+      alert(`Error al cancelar la deuda: ${err.message}`);
+    }
   };
 
   // useEffect para cargar datos iniciales
@@ -371,7 +465,7 @@ const DeudasCobrar = () => {
     fetchAllClientesAndFilter();
     fetchMetodosPago();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [filtroEstado]); // ← Recargar cuando cambie el filtro
 
   // useEffect para el debounce de búsqueda
   useEffect(() => {
@@ -380,7 +474,7 @@ const DeudasCobrar = () => {
     }, 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [searchTerm, filtroEstado]); // ← También depende del filtro
 
   if (loading) {
     return (
@@ -408,6 +502,50 @@ const DeudasCobrar = () => {
         </h1>
       </div>
 
+      {/* Botones de filtro por estado */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        <button
+          onClick={() => setFiltroEstado("En Proceso")}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "En Proceso"
+              ? "bg-green-500 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          En Proceso
+        </button>
+        <button
+          onClick={() => setFiltroEstado("Finalizado")}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Finalizado"
+              ? "bg-gray-500 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Finalizados
+        </button>
+        <button
+          onClick={() => setFiltroEstado("Cancelado")}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Cancelado"
+              ? "bg-red-500 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Cancelados
+        </button>
+        <button
+          onClick={() => setFiltroEstado("Caducado")}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Caducado"
+              ? "bg-orange-500 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Caducados
+        </button>
+      </div>
+
       <div className="mb-6">
         <input
           value={searchTerm}
@@ -419,7 +557,7 @@ const DeudasCobrar = () => {
 
       {clientesConDeuda.length === 0 ? (
         <p className="text-center text-gray-500 mt-6">
-          No hay clientes con deudas por cobrar.
+          No hay clientes con deudas en estado: <span className="font-semibold">{filtroEstado}</span>
         </p>
       ) : (
         <div className="flex flex-col gap-4">
@@ -604,15 +742,56 @@ const DeudasCobrar = () => {
                                     </div>
                                   </div>
 
-                                  {/* Abonos realizados - Placeholder */}
+                                  {/* Abonos realizados */}
                                   <div>
                                     <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                                      Abonos realizados
+                                      Historial de Abonos
                                     </h4>
-                                    <div className="border border-gray-200 rounded-lg p-3">
-                                      <p className="text-xs text-gray-500 text-center">
-                                        Funcionalidad de historial de abonos en desarrollo
-                                      </p>
+                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                      {deuda.abonos && deuda.abonos.length > 0 ? (
+                                        <table className="w-full text-sm">
+                                          <thead className="bg-gray-50">
+                                            <tr>
+                                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Fecha</th>
+                                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Método</th>
+                                              <th className="px-3 py-2 text-right text-xs font-medium text-gray-600">Monto</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-gray-200">
+                                            {deuda.abonos.map((abono) => (
+                                              <tr key={abono.id} className="bg-white hover:bg-gray-50">
+                                                <td className="px-3 py-2 text-gray-700">
+                                                  {new Date(abono.fecha).toLocaleDateString('es-CO')}
+                                                </td>
+                                                <td className="px-3 py-2 text-gray-600">
+                                                  {abono.metodo_pago_nombre || "—"}
+                                                </td>
+                                                <td className="px-3 py-2 text-right font-medium text-green-600">
+                                                  ${parseFloat(abono.monto || 0).toLocaleString()}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                          <tfoot className="bg-gray-50">
+                                            <tr>
+                                              <td colSpan="2" className="px-3 py-2 text-sm font-semibold text-gray-700">
+                                                Total Abonado:
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-sm font-bold text-green-700">
+                                                ${deuda.abonos
+                                                  .reduce((sum, a) => sum + parseFloat(a.monto || 0), 0)
+                                                  .toLocaleString()}
+                                              </td>
+                                            </tr>
+                                          </tfoot>
+                                        </table>
+                                      ) : (
+                                        <div className="p-3 text-center">
+                                          <p className="text-xs text-gray-500">
+                                            No hay abonos registrados aún
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
