@@ -153,10 +153,27 @@ class Venta(models.Model):
 
 
     def save(self, *args, **kwargs):
-        """Solo guardar, sin calcular total aquí"""
-        # NO calcular el total en save() para evitar acceder a prendas sin ID
-        # El total será calculado y guardado en el serializer
         super().save(*args, **kwargs)
+
+        # Si la venta tiene crédito, inicializarlo
+        if self.credito:
+            self.credito.monto_total = self.total
+            self.credito.monto_pendiente = self.total
+
+            if self.credito.cuotas_pendientes is None:
+                self.credito.cuotas_pendientes = self.credito.cantidad_cuotas
+
+            self.credito.save()
+
+        # Si la venta tiene apartado, inicializarlo
+        if self.apartado:
+            self.apartado.monto_total = self.total
+            self.apartado.monto_pendiente = self.total
+
+            if self.apartado.cuotas_pendientes is None:
+                self.apartado.cuotas_pendientes = self.apartado.cantidad_cuotas
+
+            self.apartado.save()
 
 
     def clean(self):

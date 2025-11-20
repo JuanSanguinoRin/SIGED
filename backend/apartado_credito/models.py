@@ -4,6 +4,10 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
+from dominios_comunes.models import Estado
+
+ESTADO_CANCELADO = 3  # ID del estado "Cancelado"
+ESTADO_FINALIZADO = 1
 
 # Create your models here.
 class Apartado(models.Model):
@@ -49,6 +53,31 @@ class Apartado(models.Model):
         """Calcula el porcentaje pagado del apartado"""
         cuotas_pagadas = self.cantidad_cuotas - self.cuotas_pendientes
         return (cuotas_pagadas / self.cantidad_cuotas) * 100 if self.cantidad_cuotas > 0 else 0
+    
+    def cancelar(self):
+        from compra_venta.models import Venta
+    
+        # Buscar la venta que tiene este crédito/apartado
+        try:
+            if hasattr(self, 'venta'):  # Si ya tiene el related_name configurado
+                venta = self.venta
+            else:  # Fallback
+                venta = Venta.objects.get(credito=self.id) if isinstance(self, Credito) else Venta.objects.get(apartado=self.id)
+        except Venta.DoesNotExist:
+            raise ValidationError("No se encontró la venta asociada")
+
+        # Revertir stock
+        for p in venta.prendas.all():
+            prenda = p.prenda
+            prenda.existencia += p.cantidad
+            prenda.save(update_fields=['existencia'])
+
+        # Actualizar estado
+        self.estado_id = ESTADO_CANCELADO
+
+        self.monto_pendiente = 0
+        self.cuotas_pendientes = 0
+        self.save(update_fields=['estado_id', 'monto_pendiente', 'cuotas_pendientes'])
 
     class Meta:
         verbose_name = "Apartado"
@@ -117,6 +146,32 @@ class Credito(models.Model):
         """Calcula el porcentaje pagado del crédito"""
         cuotas_pagadas = self.cantidad_cuotas - self.cuotas_pendientes
         return (cuotas_pagadas / self.cantidad_cuotas) * 100 if self.cantidad_cuotas > 0 else 0
+
+
+    def cancelar(self):
+        from compra_venta.models import Venta
+    
+        # Buscar la venta que tiene este crédito/apartado
+        try:
+            if hasattr(self, 'venta'):  # Si ya tiene el related_name configurado
+                venta = self.venta
+            else:  # Fallback
+                venta = Venta.objects.get(credito=self.id) if isinstance(self, Credito) else Venta.objects.get(apartado=self.id)
+        except Venta.DoesNotExist:
+            raise ValidationError("No se encontró la venta asociada")
+
+        # Revertir stock
+        for p in venta.prendas.all():
+            prenda = p.prenda
+            prenda.existencia += p.cantidad
+            prenda.save(update_fields=['existencia'])
+
+        # Actualizar estado
+        self.estado_id = ESTADO_CANCELADO
+
+        self.monto_pendiente = 0
+        self.cuotas_pendientes = 0
+        self.save(update_fields=['estado_id', 'monto_pendiente', 'cuotas_pendientes'])
 
     class Meta:
         verbose_name = "Crédito"
