@@ -877,15 +877,20 @@ const fetchAllClientesAndFilter = async () => {
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
 
-            {abonoModal.deuda?.monto_pendiente && abonoModal.deuda?.cuotas_pendientes > 0 && (
-              <div className="mt-2 text-sm text-blue-600 font-medium">
-                Recomendado por cuota: $
-                {calcularValorCuotaRecomendado(
-                  abonoModal.deuda.monto_pendiente,
-                  abonoModal.deuda.cuotas_pendientes
+
+            {abonoModal.deuda?.monto_pendiente &&
+                abonoModal.deuda?.cuotas_pendientes > 0 && (
+                  <div className="mt-2 text-sm text-blue-600 font-medium">
+                    Recomendado por cuota: $
+                    {Number(
+                      calcularValorCuotaRecomendado(
+                        abonoModal.deuda.monto_pendiente,
+                        abonoModal.deuda.cuotas_pendientes
+                      )
+                    ).toLocaleString()}
+                  </div>
                 )}
-              </div>
-            )}
+
 
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Método de Pago
