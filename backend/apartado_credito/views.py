@@ -21,6 +21,25 @@ class ApartadoViewSet(viewsets.ModelViewSet):
     queryset = Apartado.objects.all()
     serializer_class = ApartadoSerializer
 
+
+    def get_queryset(self):
+        """Verificar estados vencidos antes de devolver resultados"""
+        queryset = super().get_queryset()
+        
+        # Verificar estados solo para apartados en proceso
+        from apartado_credito.models import ESTADO_EN_PROCESO
+        for apartado in queryset.filter(estado_id=ESTADO_EN_PROCESO):
+            apartado.verificar_y_actualizar_estado()
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Verificar estado al obtener un apartado específico"""
+        instance = self.get_object()
+        instance.verificar_y_actualizar_estado()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         try:
             serializer.is_valid(raise_exception=True)
@@ -82,6 +101,24 @@ class ApartadoViewSet(viewsets.ModelViewSet):
 class CreditoViewSet(viewsets.ModelViewSet):
     queryset = Credito.objects.all()
     serializer_class = CreditoSerializer
+
+    def get_queryset(self):
+        """Verificar estados vencidos antes de devolver resultados"""
+        queryset = super().get_queryset()
+        
+        # Verificar estados solo para créditos en proceso
+        from apartado_credito.models import ESTADO_EN_PROCESO
+        for credito in queryset.filter(estado_id=ESTADO_EN_PROCESO):
+            credito.verificar_y_actualizar_estado()
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Verificar estado al obtener un crédito específico"""
+        instance = self.get_object()
+        instance.verificar_y_actualizar_estado()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         try:
