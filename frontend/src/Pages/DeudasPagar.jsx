@@ -71,38 +71,34 @@ const DeudasPagar = () => {
     }
   };
 
-  const fetchAllProveedoresAndFilter = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API_BASE}/api/terceros/proveedores/`);
-      if (!res.ok) throw new Error("Error al obtener proveedores");
-      const data = await res.json();
+const fetchAllProveedoresAndFilter = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    // ✅ UNA SOLA CONSULTA
+    const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-pagar-optimizado/`);
+    if (!res.ok) throw new Error("Error al obtener deudas");
+    const data = await res.json();
 
-      const promProveedores = data.map(async (p) => {
-        const deudas = await obtenerDeudasPorProveedor(p.id);
-        return { proveedor: p, deudas };
-      });
+    // Filtrar por estado
+    const filtrado = data
+      .map((item) => {
+        const deudasFiltradas = item.deudas.filter((d) => {
+          const estadoNombre = getEstadoNombre(d.estado);
+          return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
+        });
+        return { proveedor: item.proveedor, deudas: deudasFiltradas };
+      })
+      .filter((it) => it.deudas.length > 0);
 
-      const all = await Promise.all(promProveedores);
-      const filtrado = all
-        .map((item) => {
-          const deudasPendientes = item.deudas.filter((d) => {
-            const estadoNombre = getEstadoNombre(d.estado);
-            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
-          });
-          return { proveedor: item.proveedor, deudas: deudasPendientes };
-        })
-        .filter((it) => it.deudas.length > 0);
-
-      setProveedoresConDeuda(filtrado);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+    setProveedoresConDeuda(filtrado);
+  } catch (err) {
+    console.error(err);
+    setError(err.message || String(err));
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleBuscar = async (termino) => {
     if (!termino) {
@@ -124,10 +120,7 @@ const DeudasPagar = () => {
       const data = await response.json();
       const lista = Array.isArray(data) ? data : [data];
 
-      const prom = lista.map(async (p) => ({
-        proveedor: p,
-        deudas: await obtenerDeudasPorProveedor(p.id),
-      }));
+     
       const all = await Promise.all(prom);
 
       const filtrado = all
@@ -147,75 +140,7 @@ const DeudasPagar = () => {
     }
   };
 
-  const obtenerDeudasPorProveedor = async (proveedorId) => {
-    try {
-      const comprasRes = await fetch(
-        `${API_BASE}/api/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedorId}`
-      );
-      if (!comprasRes.ok) return [];
-      const compras = await comprasRes.json();
-
-      const deudasArr = await Promise.all(
-        compras.map(async (c) => {
-          if (c.credito) {
-            const creditoId = typeof c.credito === "object" ? c.credito.id : c.credito;
-            try {
-              const det = await fetch(
-                `${API_BASE}/api/apartado_credito/creditos/${creditoId}/`
-              );
-              if (!det.ok) throw new Error("no detalle credito");
-              const crédito = await det.json();
-
-              // Obtener cuotas/abonos del crédito
-              const cuotasRes = await fetch(
-                `${API_BASE}/api/apartado_credito/cuotas/?credito=${creditoId}`
-              );
-              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
-
-              return {
-                compra_id: c.id,
-                compra: c,
-                tipo: "Crédito",
-                total: c.total,
-                cuotas_pendientes: crédito.cuotas_pendientes,
-                fecha_limite: crédito.fecha_limite,
-                estado:
-                  getEstadoNombre(crédito.estado_detalle) ||
-                  getEstadoNombre(crédito.estado) ||
-                  getEstadoNombre(crédito.estado_nombre),
-                credito_id: crédito.id,
-                monto_pendiente: crédito.monto_pendiente ?? null,
-                cantidad_cuotas: crédito.cantidad_cuotas,
-                interes: crédito.interes,
-                descripcion: crédito.descripcion,
-                abonos: cuotas,
-              };
-            } catch (e) {
-              return {
-                compra_id: c.id,
-                compra: c,
-                tipo: "Crédito",
-                total: c.total,
-                cuotas_pendientes: c.credito?.cuotas_pendientes ?? null,
-                fecha_limite: c.credito?.fecha_limite ?? null,
-                estado: c.credito?.estado || null,
-                credito_id: creditoId,
-                monto_pendiente: c.credito?.monto_pendiente ?? null,
-                abonos: [],
-              };
-            }
-          } else {
-            return null;
-          }
-        })
-      );
-
-      return deudasArr.filter(Boolean);
-    } catch (err) {
-      console.error("Error obtenerDeudasPorProveedor:", err);
-      return [];
-    }
-  };
+  
 
   const openAbonarModal = (proveedor, deuda) => {
     setAbonoModal({
