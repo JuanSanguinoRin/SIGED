@@ -79,39 +79,34 @@ const DeudasCobrar = () => {
     }
   };
 
-  const fetchAllClientesAndFilter = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API_BASE}/api/terceros/clientes/`);
-      if (!res.ok) throw new Error("Error al obtener clientes");
-      const data = await res.json();
+const fetchAllClientesAndFilter = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    // ✅ UNA SOLA CONSULTA
+    const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-cobrar-optimizado/`);
+    if (!res.ok) throw new Error("Error al obtener deudas");
+    const data = await res.json();
 
-      const promClients = data.map(async (c) => {
-        const deudas = await obtenerDeudasPorCliente(c.id);
-        return { cliente: c, deudas };
-      });
+    // Filtrar por estado
+    const filtrado = data
+      .map((item) => {
+        const deudasFiltradas = item.deudas.filter((d) => {
+          const estadoNombre = getEstadoNombre(d.estado);
+          return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
+        });
+        return { cliente: item.cliente, deudas: deudasFiltradas };
+      })
+      .filter((it) => it.deudas.length > 0);
 
-      const all = await Promise.all(promClients);
-      const filtrado = all
-        .map((item) => {
-          const deudasPendientes = item.deudas.filter((d) => {
-            const estadoNombre = getEstadoNombre(d.estado);
-            // Filtrar por el estado seleccionado
-            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
-          });
-          return { cliente: item.cliente, deudas: deudasPendientes };
-        })
-        .filter((it) => it.deudas.length > 0);
-
-      setClientesConDeuda(filtrado);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+    setClientesConDeuda(filtrado);
+  } catch (err) {
+    console.error(err);
+    setError(err.message || String(err));
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleBuscar = async (termino) => {
     if (!termino) {

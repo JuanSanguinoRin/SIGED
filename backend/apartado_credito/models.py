@@ -5,9 +5,13 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 from dominios_comunes.models import Estado
+from django.utils import timezone
+from django.db import transaction
 
 ESTADO_CANCELADO = 3  # ID del estado "Cancelado"
 ESTADO_FINALIZADO = 1
+ESTADO_EN_PROCESO = 4
+ESTADO_CADUCADO = 5  # ← Agregar esta constante
 
 # Create your models here.
 class Apartado(models.Model):
@@ -79,6 +83,39 @@ class Apartado(models.Model):
         self.cuotas_pendientes = 0
         self.save(update_fields=['estado_id', 'monto_pendiente', 'cuotas_pendientes'])
 
+    def verificar_y_actualizar_estado(self):
+        """
+        Verifica si el apartado está vencido y actualiza su estado.
+        Retorna True si se actualizó el estado.
+        """
+        from django.utils import timezone
+        from django.db import transaction
+        
+        # No hacer nada si ya está finalizado, cancelado o caducado
+        if self.estado_id in [ESTADO_FINALIZADO, ESTADO_CANCELADO, ESTADO_CADUCADO]:
+            return False
+        
+        # Verificar si está vencido y tiene deuda pendiente
+        if self.fecha_limite < timezone.now().date() and self.monto_pendiente > Decimal('0.00'):
+            with transaction.atomic():
+                # Cambiar estado a CADUCADO
+                self.estado_id = ESTADO_CADUCADO
+                self.save(update_fields=['estado'])
+                
+                # Restaurar inventario
+                from compra_venta.models import Venta
+                try:
+                    venta = Venta.objects.get(apartado=self)
+                    for prenda_venta in venta.prendas.all():
+                        prenda = prenda_venta.prenda
+                        prenda.existencia += prenda_venta.cantidad
+                        prenda.save(update_fields=['existencia'])
+                except Venta.DoesNotExist:
+                    pass
+                
+            return True
+        return False
+
     class Meta:
         verbose_name = "Apartado"
         verbose_name_plural = "Apartados"
@@ -149,29 +186,72 @@ class Credito(models.Model):
 
 
     def cancelar(self):
-        from compra_venta.models import Venta
-    
-        # Buscar la venta que tiene este crédito/apartado
-        try:
-            if hasattr(self, 'venta'):  # Si ya tiene el related_name configurado
-                venta = self.venta
-            else:  # Fallback
-                venta = Venta.objects.get(credito=self.id) if isinstance(self, Credito) else Venta.objects.get(apartado=self.id)
-        except Venta.DoesNotExist:
-            raise ValidationError("No se encontró la venta asociada")
+        from django.db import transaction
+        from compra_venta.models import Venta, Compra
+        
+        with transaction.atomic():
+            # Para VENTAS: devolver inventario
+            try:
+                venta = Venta.objects.get(credito=self)
+                for prenda_venta in venta.prendas.all():
+                    prenda = prenda_venta.prenda
+                    prenda.existencia += prenda_venta.cantidad
+                    prenda.save(update_fields=['existencia'])
+            except Venta.DoesNotExist:
+                pass
+            
+            # Para COMPRAS: restar inventario
+            try:
+                compra = Compra.objects.get(credito=self)
+                for prenda_compra in compra.prendas.all():
+                    prenda = prenda_compra.prenda
+                    prenda.existencia -= prenda_compra.cantidad
+                    prenda.save(update_fields=['existencia'])
+            except Compra.DoesNotExist:
+                pass
+            
+            self.estado_id = ESTADO_CANCELADO
+            self.monto_pendiente = Decimal('0.00')
+            self.cuotas_pendientes = 0
+            self.save(update_fields=['estado', 'monto_pendiente', 'cuotas_pendientes'])
 
-        # Revertir stock
-        for p in venta.prendas.all():
-            prenda = p.prenda
-            prenda.existencia += p.cantidad
-            prenda.save(update_fields=['existencia'])
+    def verificar_y_actualizar_estado(self):
+        """Verifica si el crédito está vencido (funciona para ventas Y compras)"""
+        from django.utils import timezone
+        from django.db import transaction
+        
+        if self.estado_id in [ESTADO_FINALIZADO, ESTADO_CANCELADO, ESTADO_CADUCADO]:
+            return False
+        
+        if self.fecha_limite < timezone.now().date() and self.monto_pendiente > Decimal('0.00'):
+            with transaction.atomic():
+                self.estado_id = ESTADO_CADUCADO
+                self.save(update_fields=['estado'])
+                
+                from compra_venta.models import Venta, Compra
+                
+                # Para VENTAS (cobrar): sumar inventario
+                try:
+                    venta = Venta.objects.get(credito=self)
+                    for prenda_venta in venta.prendas.all():
+                        prenda = prenda_venta.prenda
+                        prenda.existencia += prenda_venta.cantidad
+                        prenda.save(update_fields=['existencia'])
+                except Venta.DoesNotExist:
+                    pass
+                
+                # Para COMPRAS (pagar): restar inventario
+                try:
+                    compra = Compra.objects.get(credito=self)
+                    for prenda_compra in compra.prendas.all():
+                        prenda = prenda_compra.prenda
+                        prenda.existencia -= prenda_compra.cantidad
+                        prenda.save(update_fields=['existencia'])
+                except Compra.DoesNotExist:
+                    pass
+            return True
+        return False
 
-        # Actualizar estado
-        self.estado_id = ESTADO_CANCELADO
-
-        self.monto_pendiente = 0
-        self.cuotas_pendientes = 0
-        self.save(update_fields=['estado_id', 'monto_pendiente', 'cuotas_pendientes'])
 
     class Meta:
         verbose_name = "Crédito"
