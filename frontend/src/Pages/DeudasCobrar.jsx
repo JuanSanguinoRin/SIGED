@@ -7,6 +7,11 @@ function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
 }
 
+const calcularValorCuotaRecomendado = (montoPendiente, cuotasRestantes) => {
+    if (!montoPendiente || !cuotasRestantes) return null;
+    return parseFloat(montoPendiente / cuotasRestantes).toFixed(2);
+  };
+
 // Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
   const getEstadoConfig = (estadoNombre) => {
@@ -18,6 +23,8 @@ const EstadoBadge = ({ estado }) => {
     if (nombre === "caducado") return { color: "bg-orange-100 text-orange-700", text: "Caducado" };
     return { color: "bg-gray-100 text-gray-500", text: estado || "—" };
   };
+
+  
 
   const config = getEstadoConfig(estado);
   return (
@@ -38,7 +45,7 @@ const DeudasCobrar = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [openClientId, setOpenClientId] = useState(null);
   const [openDeudaId, setOpenDeudaId] = useState(null);
-  
+
   // Estado para el filtro activo
   const [filtroEstado, setFiltroEstado] = useState("En Proceso");
 
@@ -46,7 +53,7 @@ const DeudasCobrar = () => {
     if (!estado) return "";
     if (typeof estado === "string") return estado;
     if (typeof estado === "object") return estado.nombre || "";
-    
+
     // Si es un número (ID), convertirlo al nombre
     if (typeof estado === "number") {
       const estadosMap = {
@@ -57,7 +64,7 @@ const DeudasCobrar = () => {
       };
       return estadosMap[estado] || "";
     }
-    
+
     return "";
   };
 
@@ -374,6 +381,7 @@ const fetchAllClientesAndFilter = async () => {
                   estado: estadoActualizado,
                   abonos: cuotasActualizadas, // ← Actualizar historial de abonos
                 };
+                
               }
               return d;
             });
@@ -431,18 +439,18 @@ const fetchAllClientesAndFilter = async () => {
       }
 
       const data = await res.json();
-      
+
       // Actualizar la lista local eliminando la deuda cancelada
       setClientesConDeuda((prev) =>
         prev
           .map((item) => {
             if (item.cliente.id !== cliente.id) return item;
-            
+
             // Filtrar la deuda cancelada
             const deudasActualizadas = item.deudas.filter(
               (d) => !(d.venta_id === deuda.venta_id && d.tipo === deuda.tipo)
             );
-            
+
             return { ...item, deudas: deudasActualizadas };
           })
           .filter((item) => item.deudas.length > 0)
@@ -501,41 +509,37 @@ const fetchAllClientesAndFilter = async () => {
       <div className="mb-6 flex flex-wrap gap-3">
         <button
           onClick={() => setFiltroEstado("En Proceso")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filtroEstado === "En Proceso"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "En Proceso"
               ? "bg-green-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+            }`}
         >
           En Proceso
         </button>
         <button
           onClick={() => setFiltroEstado("Finalizado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filtroEstado === "Finalizado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Finalizado"
               ? "bg-gray-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+            }`}
         >
           Finalizados
         </button>
         <button
           onClick={() => setFiltroEstado("Cancelado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filtroEstado === "Cancelado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Cancelado"
               ? "bg-red-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+            }`}
         >
           Cancelados
         </button>
         <button
           onClick={() => setFiltroEstado("Caducado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filtroEstado === "Caducado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Caducado"
               ? "bg-orange-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+            }`}
         >
           Caducados
         </button>
@@ -872,6 +876,19 @@ const fetchAllClientesAndFilter = async () => {
               placeholder="Ingrese el monto"
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+
+            {abonoModal.deuda?.monto_pendiente &&
+                abonoModal.deuda?.cuotas_pendientes > 0 && (
+                  <div className="mt-2 text-sm text-blue-600 font-medium">
+                    Recomendado por cuota: $
+                    {Number(
+                      calcularValorCuotaRecomendado(
+                        abonoModal.deuda.monto_pendiente,
+                        abonoModal.deuda.cuotas_pendientes
+                      )
+                    ).toLocaleString()}
+                  </div>
+                )}
 
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Método de Pago

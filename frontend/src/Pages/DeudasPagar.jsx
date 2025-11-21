@@ -7,6 +7,11 @@ function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
 }
 
+const calcularValorCuotaRecomendado = (montoPendiente, cuotasRestantes) => {
+    if (!montoPendiente || !cuotasRestantes) return null;
+    return parseFloat(montoPendiente / cuotasRestantes).toFixed(2);
+  };
+
 // Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
   const getEstadoConfig = (estadoNombre) => {
@@ -120,7 +125,10 @@ const fetchAllProveedoresAndFilter = async () => {
       const data = await response.json();
       const lista = Array.isArray(data) ? data : [data];
 
-     
+      const prom = lista.map(async (p) => ({
+        proveedor: p,
+        deudas: await obtenerDeudasPorProveedor(p.id),
+      }));
       const all = await Promise.all(prom);
 
       const filtrado = all
@@ -140,7 +148,77 @@ const fetchAllProveedoresAndFilter = async () => {
     }
   };
 
-  
+
+  //ESTE METODO DA MUCHOS PROBLEMAS DE RENDIMIENTO, DEBO REEMPLAZARLO CUANDO CLAUDE ME DE NUEVOS TOKENS PIPIPI
+  const obtenerDeudasPorProveedor = async (proveedorId) => {
+    try {
+      const comprasRes = await fetch(
+        `${API_BASE}/api/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedorId}`
+      );
+      if (!comprasRes.ok) return [];
+      const compras = await comprasRes.json();
+
+      const deudasArr = await Promise.all(
+        compras.map(async (c) => {
+          if (c.credito) {
+            const creditoId = typeof c.credito === "object" ? c.credito.id : c.credito;
+            try {
+              const det = await fetch(
+                `${API_BASE}/api/apartado_credito/creditos/${creditoId}/`
+              );
+              if (!det.ok) throw new Error("no detalle credito");
+              const crédito = await det.json();
+
+              // Obtener cuotas/abonos del crédito
+              const cuotasRes = await fetch(
+                `${API_BASE}/api/apartado_credito/cuotas/?credito=${creditoId}`
+              );
+              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
+
+              return {
+                compra_id: c.id,
+                compra: c,
+                tipo: "Crédito",
+                total: c.total,
+                cuotas_pendientes: crédito.cuotas_pendientes,
+                fecha_limite: crédito.fecha_limite,
+                estado:
+                  getEstadoNombre(crédito.estado_detalle) ||
+                  getEstadoNombre(crédito.estado) ||
+                  getEstadoNombre(crédito.estado_nombre),
+                credito_id: crédito.id,
+                monto_pendiente: crédito.monto_pendiente ?? null,
+                cantidad_cuotas: crédito.cantidad_cuotas,
+                interes: crédito.interes,
+                descripcion: crédito.descripcion,
+                abonos: cuotas,
+              };
+            } catch (e) {
+              return {
+                compra_id: c.id,
+                compra: c,
+                tipo: "Crédito",
+                total: c.total,
+                cuotas_pendientes: c.credito?.cuotas_pendientes ?? null,
+                fecha_limite: c.credito?.fecha_limite ?? null,
+                estado: c.credito?.estado || null,
+                credito_id: creditoId,
+                monto_pendiente: c.credito?.monto_pendiente ?? null,
+                abonos: [],
+              };
+            }
+          } else {
+            return null;
+          }
+        })
+      );
+
+      return deudasArr.filter(Boolean);
+    } catch (err) {
+      console.error("Error obtenerDeudasPorProveedor:", err);
+      return [];
+    }
+  };
 
   const openAbonarModal = (proveedor, deuda) => {
     setAbonoModal({
@@ -717,6 +795,19 @@ const fetchAllProveedoresAndFilter = async () => {
               placeholder="Ingrese el monto"
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
+
+                {abonoModal.deuda?.monto_pendiente &&
+                    abonoModal.deuda?.cuotas_pendientes > 0 && (
+                      <div className="mt-2 text-sm text-blue-600 font-medium">
+                        Recomendado por cuota: $
+                        {Number(
+                          calcularValorCuotaRecomendado(
+                            abonoModal.deuda.monto_pendiente,
+                            abonoModal.deuda.cuotas_pendientes
+                          )
+                        ).toLocaleString()}
+                      </div>
+                    )}
 
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Método de Pago
