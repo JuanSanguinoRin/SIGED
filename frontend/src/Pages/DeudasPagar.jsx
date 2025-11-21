@@ -544,7 +544,9 @@ const fetchAllProveedoresAndFilter = async () => {
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-700 truncate">
-                                {deuda.descripcion || `Compra #${deuda.compra_id}`}
+                                {`Compra #${deuda.compra_id}${
+                                  deuda.descripcion ? ` — ${deuda.descripcion}` : ""
+                                }`}
                               </p>
                             </div>
                             <div className="flex items-center gap-3 ml-4">
