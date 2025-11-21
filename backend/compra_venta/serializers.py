@@ -107,6 +107,15 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
         compra.total = compra.calcular_total()
         compra.save(update_fields=['total'])
 
+        # ✅ AGREGAR ESTO: Si la compra tiene crédito, inicializar montos
+        if compra.credito:
+            compra.credito.monto_total = compra.total
+            compra.credito.monto_pendiente = compra.total
+            # Asegurar cuotas_pendientes inicial si no se ha definido
+            if compra.credito.cuotas_pendientes is None:
+                compra.credito.cuotas_pendientes = compra.credito.cantidad_cuotas
+            compra.credito.save()
+
         return compra
     
     @transaction.atomic
@@ -120,7 +129,6 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
 
         # actualizar prendas si vienen nuevas
         if prendas_data is not None:
-
             # eliminar prendas anteriores (su delete ya revierte stock)
             instance.prendas.all().delete()
 
@@ -132,7 +140,7 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
         instance.total = instance.calcular_total()
         instance.save(update_fields=['total'])
 
-        # si es compra a crédito, actualizar el crédito
+        # ✅ Si es compra a crédito, actualizar el crédito
         if instance.credito:
             instance.credito.monto_total = instance.total
             instance.credito.monto_pendiente = instance.total
