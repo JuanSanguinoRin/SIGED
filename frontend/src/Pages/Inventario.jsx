@@ -7,6 +7,7 @@ import ModalArchivados from "../Components/ModalArchivados";
 import { FaBox, FaPlus, FaCheck, FaTimes } from "react-icons/fa";
 import { MdArchive, MdUnarchive } from "react-icons/md";
 import { TbEdit } from "react-icons/tb";
+import { apiUrl } from "../config/api";
 
 
 
@@ -28,7 +29,8 @@ export default function Inventario() {
   // 🔹 Cargar datos desde API
   const cargarPrendas = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/prendas/prendas/");
+      const res = await fetch(apiUrl("/prendas/prendas/"));
+      if (!res.ok) throw new Error("Error al obtener prendas");
       const data = await res.json();
       setPrendas(data.filter((p) => !p.archivado));
     } catch (err) {

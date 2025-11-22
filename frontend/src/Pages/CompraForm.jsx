@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from "react";
+"use client";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import { apiUrl } from "../config/api";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
 
 
@@ -31,9 +34,9 @@ const CompraForm = () => {
     const fetchData = async () => {
       try {
         const [provRes, metRes, preRes] = await Promise.all([
-          fetch(`${BASE_URL}terceros/proveedores/`),
-          fetch(`${BASE_URL}dominios_comunes/metodos-pago/`),
-          fetch(`${BASE_URL}prendas/prendas/`),
+          fetchProveedores(),
+          fetchMetodosPago(),
+          fetchPrendas(),
         ]);
         const [prov, met, pre] = await Promise.all([
           provRes.json(),
@@ -49,6 +52,21 @@ const CompraForm = () => {
     };
     fetchData();
   }, []);
+
+  const fetchPrendas = async () => {
+    const res = await axios.get(apiUrl("/prendas/prendas/"));
+    return res.data;
+  };
+
+  const fetchProveedores = async () => {
+    const res = await fetch(apiUrl("/terceros/proveedores/"));
+    return res.json();
+  };
+
+  const fetchMetodosPago = async () => {
+    const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
+    return res.json();
+  };
 
   // --- Calcular totales ---
   const calcularSubtotal = (item) => {
@@ -115,17 +133,7 @@ const CompraForm = () => {
     }
 
     // 🔹 Crear la compra
-    const response = await fetch(`${BASE_URL}compra_venta/compras/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Error:", errorData);
-      throw new Error("Error al registrar la compra");
-    }
+    await axios.post(apiUrl("/compra_venta/ventas/"), payload);
 
     setMensaje("✅ Compra registrada correctamente");
     setSelectedProveedor("");

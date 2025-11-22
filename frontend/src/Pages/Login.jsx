@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "../css/Login.css";
+import { apiUrl } from "../config/api";
 
 
 
@@ -12,7 +13,7 @@ function Login() {
     e.preventDefault();
     setError("");
 
-    const response = await fetch("http://127.0.0.1:8000/api/auth/login/", {
+    const response = await fetch(apiUrl("/auth/login/"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include", // importante para mantener la sesión
@@ -22,7 +23,7 @@ function Login() {
     if (response.ok) {
       window.location.href = "/admin";
     } else {
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       setError(data.error || "Error al iniciar sesión");
     }
   };

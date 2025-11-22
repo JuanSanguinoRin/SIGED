@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
+import { apiUrl } from "../config/api";
 import ClientCard from "../Components/ClientCard";
 import ClientDetail from "../Components/ClientDetail";
 import ClientSearchBar from "../Components/ClientSearchBar";
-import ClientModal from "../Components/ClientModal"; // Renombrado y unificado
-
+import ClientModal from "../Components/ClientModal";
 
 const Clientes = () => {
   const [clientes, setClientes] = useState([]);
@@ -13,17 +13,15 @@ const Clientes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalCliente, setModalCliente] = useState(null);
-  const [isCreating, setIsCreating] = useState(false); // 🔹 Nuevo: controlar modo
-
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchClientes();
   }, []);
 
-
   const fetchClientes = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/terceros/clientes/");
+      const response = await fetch(apiUrl("/terceros/clientes/"));
       if (!response.ok) throw new Error("Error al obtener clientes");
       const data = await response.json();
       setClientes(data);
@@ -34,7 +32,6 @@ const Clientes = () => {
     }
   };
 
-
   const handleBuscar = async (termino) => {
     if (!termino) {
       fetchClientes();
@@ -44,9 +41,9 @@ const Clientes = () => {
     try {
       let url = "";
       if (/^\d+$/.test(termino)) {
-        url = `http://127.0.0.1:8000/api/terceros/clientes/buscar_por_cedula/?cedula=${termino}`;
+        url = apiUrl(`/terceros/clientes/buscar_por_cedula/?cedula=${termino}`);
       } else {
-        url = `http://127.0.0.1:8000/api/terceros/clientes/buscar_por_nombre/?nombre=${termino}`;
+        url = apiUrl(`/terceros/clientes/buscar_por_nombre/?nombre=${termino}`);
       }
 
       const response = await fetch(url);
@@ -66,7 +63,6 @@ const Clientes = () => {
     }
   };
 
-
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       handleBuscar(searchTerm);
@@ -74,7 +70,6 @@ const Clientes = () => {
 
     return () => clearTimeout(delayDebounce);
   }, [searchTerm]);
-
 
   const handleSelect = async (clienteId) => {
     if (selectedClient?.id === clienteId) {
@@ -84,10 +79,9 @@ const Clientes = () => {
 
     try {
       const [detalleRes, ventasRes] = await Promise.all([
-        fetch(`http://127.0.0.1:8000/api/terceros/clientes/${clienteId}/`),
-        fetch(`http://127.0.0.1:8000/api/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`),
+        fetch(apiUrl(`/terceros/clientes/${clienteId}/`)),
+        fetch(apiUrl(`/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`)),
       ]);
-
 
       if (!detalleRes.ok) throw new Error("Error al obtener detalle del cliente");
       if (!ventasRes.ok) throw new Error("Error al obtener ventas");
@@ -107,28 +101,23 @@ const Clientes = () => {
     }
   };
 
-
-  // 🔹 Abrir modal para CREAR cliente
+  // Abrir modal para CREAR cliente
   const handleCreateClick = () => {
     setModalCliente({});
     setIsCreating(true);
   };
 
-
-  // 🔹 Abrir modal para EDITAR cliente
+  // Abrir modal para EDITAR cliente
   const handleEdit = (cliente) => {
     setModalCliente(cliente);
     setIsCreating(false);
   };
 
-
-  // 🔹 Guardar cliente (crear o actualizar)
+  // Guardar cliente (crear o actualizar)
   const handleSave = (clienteActualizado) => {
     if (isCreating) {
-      // Crear nuevo cliente
       setClientes((prev) => [...prev, clienteActualizado]);
     } else {
-      // Actualizar cliente existente
       setClientes((prev) =>
         prev.map((c) => (c.id === clienteActualizado.id ? clienteActualizado : c))
       );
@@ -136,7 +125,6 @@ const Clientes = () => {
     setModalCliente(null);
     setIsCreating(false);
   };
-
 
   if (loading) {
     return (
@@ -166,7 +154,7 @@ const Clientes = () => {
           Crear Cliente
         </button>
       </div>
-      
+
       <ClientSearchBar searchTerm={searchTerm} onSearch={setSearchTerm} />
 
       {clientes.length === 0 ? (
@@ -187,10 +175,7 @@ const Clientes = () => {
 
               {selectedClient?.id === cliente.id && (
                 <div className="p-4 bg-white border-t border-gray-200 transition-all duration-500 ease-in-out">
-                  <ClientDetail
-                    cliente={selectedClient}
-                    historial={selectedClient.historial}
-                  />
+                  <ClientDetail cliente={selectedClient} historial={selectedClient.historial} />
                 </div>
               )}
             </div>
@@ -198,7 +183,7 @@ const Clientes = () => {
         </div>
       )}
 
-      {/* 🔹 Modal unificado para crear y editar */}
+      {/* Modal unificado para crear y editar */}
       {modalCliente && (
         <ClientModal
           cliente={modalCliente}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaMoneyBillWave } from "react-icons/fa";
+import { apiUrl } from "../config/api";
 
 const BASE_URL = "http://127.0.0.1:8000/api/";
 
@@ -48,18 +49,18 @@ const VentaForm = () => {
   }, []);
 
   const fetchClientes = async () => {
-    const res = await axios.get(`${BASE_URL}terceros/clientes/`);
+    const res = await axios.get(apiUrl("/terceros/clientes/"));
     setClientes(res.data);
   };
 
   const fetchPrendas = async () => {
-    const res = await axios.get(`${BASE_URL}prendas/prendas/`);
+    const res = await axios.get(apiUrl("/prendas/prendas/"));
     const data = Array.isArray(res.data) ? res.data : res.data.results;
     setPrendas(data.filter(p => !p.archivado && p.existencia > 0));
   };
 
   const fetchMetodosPago = async () => {
-    const res = await axios.get(`${BASE_URL}dominios_comunes/metodos-pago/`);
+    const res = await axios.get(apiUrl("/dominios_comunes/metodos-pago/"));
     setMetodosPago(res.data);
   };
 
@@ -175,33 +176,33 @@ function quantityOrZero(q) {
 
       // CREAR CRÉDITO
       if (venta.credito) {
-        const res = await axios.post(`${BASE_URL}apartado_credito/creditos/`, {
-          cantidad_cuotas: Number(creditoData.cantidad_cuotas),
-          cuotas_pendientes: Number(creditoData.cantidad_cuotas), // <- obligatorio
-          interes: Number(creditoData.interes),
-          estado: 4,
-          fecha_limite: creditoData.fecha_limite,
-          monto_total: totales.totalConInteres,
-          monto_pendiente: totales.totalConInteres,
-        });
-
+        const res = await axios.post(apiUrl("/apartado_credito/creditos/"), {
+           cantidad_cuotas: Number(creditoData.cantidad_cuotas),
+           cuotas_pendientes: Number(creditoData.cantidad_cuotas), // <- obligatorio
+           interes: Number(creditoData.interes),
+           estado: 4,
+           fecha_limite: creditoData.fecha_limite,
+           monto_total: totales.totalConInteres,
+           monto_pendiente: totales.totalConInteres,
+         });
+ 
         creditoId = res.data.id;
       }
 
       // CREAR APARTADO
       if (venta.apartado) {
-        const res = await axios.post(`${BASE_URL}apartado_credito/apartados/`, {
-          cantidad_cuotas: Number(apartadoData.cantidad_cuotas),
-          cuotas_pendientes: Number(creditoData.cantidad_cuotas), // <- obligatorio
-          estado: 4,
-          fecha_limite: apartadoData.fecha_limite,
-        });
-
+        const res = await axios.post(apiUrl("/apartado_credito/apartados/"), {
+           cantidad_cuotas: Number(apartadoData.cantidad_cuotas),
+           cuotas_pendientes: Number(creditoData.cantidad_cuotas), // <- obligatorio
+           estado: 4,
+           fecha_limite: apartadoData.fecha_limite,
+         });
+ 
         apartadoId = res.data.id;
       }
 
       // CREAR LA VENTA
-      await axios.post(`${BASE_URL}compra_venta/ventas/`, {
+      await axios.post(apiUrl("/compra_venta/ventas/"), {
         cliente: venta.clienteId,
         descripcion: venta.descripcion,
         metodo_pago: venta.metodo_pago,

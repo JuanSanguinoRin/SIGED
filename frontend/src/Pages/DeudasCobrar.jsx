@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-
-const API_BASE = "http://127.0.0.1:8000";
+import { apiUrl } from "../config/api";
 
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
@@ -63,7 +62,7 @@ const DeudasCobrar = () => {
 
   const fetchMetodosPago = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/dominios_comunes/metodos-pago/`);
+      const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
       if (!res.ok) throw new Error("Error al obtener métodos de pago");
       const data = await res.json();
       setMetodosPago(data);
@@ -76,7 +75,7 @@ const DeudasCobrar = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/terceros/clientes/`);
+      const res = await fetch(apiUrl("/terceros/clientes/"));
       if (!res.ok) throw new Error("Error al obtener clientes");
       const data = await res.json();
 
@@ -115,9 +114,9 @@ const DeudasCobrar = () => {
     try {
       let url = "";
       if (/^\d+$/.test(termino)) {
-        url = `${API_BASE}/api/terceros/clientes/buscar_por_cedula/?cedula=${termino}`;
+        url = apiUrl(`/terceros/clientes/buscar_por_cedula/?cedula=${termino}`);
       } else {
-        url = `${API_BASE}/api/terceros/clientes/buscar_por_nombre/?nombre=${termino}`;
+        url = apiUrl(`/terceros/clientes/buscar_por_nombre/?nombre=${termino}`);
       }
 
       const response = await fetch(url);
@@ -157,7 +156,7 @@ const DeudasCobrar = () => {
   const obtenerDeudasPorCliente = async (clienteId) => {
     try {
       const ventasRes = await fetch(
-        `${API_BASE}/api/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`
+        apiUrl(`/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`)
       );
       if (!ventasRes.ok) return [];
       const ventas = await ventasRes.json();
@@ -168,14 +167,14 @@ const DeudasCobrar = () => {
             const creditoId = typeof v.credito === "object" ? v.credito.id : v.credito;
             try {
               const det = await fetch(
-                `${API_BASE}/api/apartado_credito/creditos/${creditoId}/`
+                apiUrl(`/apartado_credito/creditos/${creditoId}/`)
               );
               if (!det.ok) throw new Error("no detalle credito");
               const crédito = await det.json();
 
               // Obtener cuotas/abonos del crédito
               const cuotasRes = await fetch(
-                `${API_BASE}/api/apartado_credito/cuotas/?credito=${creditoId}`
+                apiUrl(`/apartado_credito/cuotas/?credito=${creditoId}`)
               );
               const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
 
@@ -215,14 +214,14 @@ const DeudasCobrar = () => {
             const apartadoId = typeof v.apartado === "object" ? v.apartado.id : v.apartado;
             try {
               const det = await fetch(
-                `${API_BASE}/api/apartado_credito/apartados/${apartadoId}/`
+                apiUrl(`/apartado_credito/apartados/${apartadoId}/`)
               );
               if (!det.ok) throw new Error("no detalle apartado");
               const apartado = await det.json();
 
               // Obtener cuotas/abonos del apartado
               const cuotasRes = await fetch(
-                `${API_BASE}/api/apartado_credito/cuotas/?apartado=${apartadoId}`
+                apiUrl(`/apartado_credito/cuotas/?apartado=${apartadoId}`)
               );
               const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
 
@@ -308,7 +307,7 @@ const DeudasCobrar = () => {
     if (deuda.apartado_id) payload.apartado = deuda.apartado_id;
 
     try {
-      const res = await fetch(`${API_BASE}/api/apartado_credito/cuotas/`, {
+      const res = await fetch(apiUrl("/apartado_credito/cuotas/"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -326,12 +325,12 @@ const DeudasCobrar = () => {
       let detalleActualizado = null;
       if (deuda.credito_id) {
         const det = await fetch(
-          `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/`
+          apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/`)
         );
         detalleActualizado = det.ok ? await det.json() : null;
       } else if (deuda.apartado_id) {
         const det = await fetch(
-          `${API_BASE}/api/apartado_credito/apartados/${deuda.apartado_id}/`
+          apiUrl(`/apartado_credito/apartados/${deuda.apartado_id}/`)
         );
         detalleActualizado = det.ok ? await det.json() : null;
       }
@@ -340,12 +339,12 @@ const DeudasCobrar = () => {
       let cuotasActualizadas = [];
       if (deuda.credito_id) {
         const cuotasRes = await fetch(
-          `${API_BASE}/api/apartado_credito/cuotas/?credito=${deuda.credito_id}`
+          apiUrl(`/apartado_credito/cuotas/?credito=${deuda.credito_id}`)
         );
         cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
       } else if (deuda.apartado_id) {
         const cuotasRes = await fetch(
-          `${API_BASE}/api/apartado_credito/cuotas/?apartado=${deuda.apartado_id}`
+          apiUrl(`/apartado_credito/cuotas/?apartado=${deuda.apartado_id}`)
         );
         cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
       }
@@ -416,9 +415,9 @@ const DeudasCobrar = () => {
     try {
       let url = "";
       if (deuda.credito_id) {
-        url = `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/cancelar/`;
+        url = apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/cancelar/`);
       } else if (deuda.apartado_id) {
-        url = `${API_BASE}/api/apartado_credito/apartados/${deuda.apartado_id}/cancelar/`;
+        url = apiUrl(`/apartado_credito/apartados/${deuda.apartado_id}/cancelar/`);
       } else {
         alert("Error: No se pudo identificar el tipo de deuda");
         return;
