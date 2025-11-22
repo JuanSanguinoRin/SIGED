@@ -16,10 +16,34 @@ from rest_framework.decorators import action
 from compra_venta.models import Venta
 from compra_venta.serializers import VentaSerializer
 
+from rest_framework.decorators import action, api_view  # ← AGREGAR api_view
+from compra_venta.models import Venta, Compra  # ← AGREGAR Compra
+from compra_venta.serializers import VentaSerializer
+from django.db.models import Prefetch, Q  # ← AGREGAR estos
+
 
 class ApartadoViewSet(viewsets.ModelViewSet):
     queryset = Apartado.objects.all()
     serializer_class = ApartadoSerializer
+
+
+    def get_queryset(self):
+        """Verificar estados vencidos antes de devolver resultados"""
+        queryset = super().get_queryset()
+        
+        # Verificar estados solo para apartados en proceso
+        from apartado_credito.models import ESTADO_EN_PROCESO
+        for apartado in queryset.filter(estado_id=ESTADO_EN_PROCESO):
+            apartado.verificar_y_actualizar_estado()
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Verificar estado al obtener un apartado específico"""
+        instance = self.get_object()
+        instance.verificar_y_actualizar_estado()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         try:
@@ -82,6 +106,24 @@ class ApartadoViewSet(viewsets.ModelViewSet):
 class CreditoViewSet(viewsets.ModelViewSet):
     queryset = Credito.objects.all()
     serializer_class = CreditoSerializer
+
+    def get_queryset(self):
+        """Verificar estados vencidos antes de devolver resultados"""
+        queryset = super().get_queryset()
+        
+        # Verificar estados solo para créditos en proceso
+        from apartado_credito.models import ESTADO_EN_PROCESO
+        for credito in queryset.filter(estado_id=ESTADO_EN_PROCESO):
+            credito.verificar_y_actualizar_estado()
+        
+        return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Verificar estado al obtener un crédito específico"""
+        instance = self.get_object()
+        instance.verificar_y_actualizar_estado()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         try:
@@ -262,3 +304,172 @@ class DeudasPorClienteView(APIView):
             "cliente_id": cliente_id,
             "por_cobrar": por_cobrar
         }, status=status.HTTP_200_OK)
+@api_view(['GET'])
+def deudas_por_cobrar_optimizado(request):
+    """
+    Endpoint optimizado que trae TODOS los datos en una sola consulta.
+    GET /api/apartado_credito/deudas-por-cobrar-optimizado/
+    """
+    # Prefetch para evitar N+1
+    ventas = Venta.objects.select_related(
+        'cliente', 'credito', 'credito__estado', 'apartado', 'apartado__estado', 'metodo_pago'
+    ).prefetch_related(
+        'prendas__prenda',
+        Prefetch('credito__cuotas', queryset=Cuota.objects.select_related('metodo_pago')),
+        Prefetch('apartado__cuotas', queryset=Cuota.objects.select_related('metodo_pago'))
+    ).filter(
+        Q(credito__isnull=False) | Q(apartado__isnull=False)
+    )
+    
+    # Agrupar por cliente
+    clientes_dict = {}
+    for venta in ventas:
+        cliente_id = venta.cliente.id
+        if cliente_id not in clientes_dict:
+            clientes_dict[cliente_id] = {
+                'cliente': {
+                    'id': venta.cliente.id,
+                    'nombre': venta.cliente.nombre or '',
+                    'cedula': getattr(venta.cliente, 'cedula', None) or getattr(venta.cliente, 'identificacion', None),
+                },
+                'deudas': []
+            }
+        
+        # Construir deuda
+        if venta.credito:
+            deuda = {
+                'venta_id': venta.id,
+                'venta': {
+                    'id': venta.id,
+                    'fecha': venta.fecha,
+                    'total': str(venta.total),
+                    'prendas': [
+                        {
+                            'prenda_nombre': p.prenda.nombre,
+                            'cantidad': p.cantidad,
+                            'subtotal': str(p.subtotal)
+                        } for p in venta.prendas.all()
+                    ]
+                },
+                'tipo': 'Crédito',
+                'total': str(venta.total),
+                'cuotas_pendientes': venta.credito.cuotas_pendientes,
+                'fecha_limite': venta.credito.fecha_limite,
+                'estado': venta.credito.estado.nombre if venta.credito.estado else None,
+                'credito_id': venta.credito.id,
+                'monto_pendiente': str(venta.credito.monto_pendiente),
+                'cantidad_cuotas': venta.credito.cantidad_cuotas,
+                'interes': str(venta.credito.interes),
+                'descripcion': venta.credito.descripcion,
+                'abonos': [
+                    {
+                        'id': c.id,
+                        'fecha': c.fecha,
+                        'monto': str(c.monto),
+                        'metodo_pago_nombre': c.metodo_pago.nombre if c.metodo_pago else None
+                    } for c in venta.credito.cuotas.all()
+                ]
+            }
+            clientes_dict[cliente_id]['deudas'].append(deuda)
+        
+        elif venta.apartado:
+            deuda = {
+                'venta_id': venta.id,
+                'venta': {
+                    'id': venta.id,
+                    'fecha': venta.fecha,
+                    'total': str(venta.total),
+                    'prendas': [
+                        {
+                            'prenda_nombre': p.prenda.nombre,
+                            'cantidad': p.cantidad,
+                            'subtotal': str(p.subtotal)
+                        } for p in venta.prendas.all()
+                    ]
+                },
+                'tipo': 'Apartado',
+                'total': str(venta.total),
+                'cuotas_pendientes': venta.apartado.cuotas_pendientes,
+                'fecha_limite': venta.apartado.fecha_limite,
+                'estado': venta.apartado.estado.nombre if venta.apartado.estado else None,
+                'apartado_id': venta.apartado.id,
+                'monto_pendiente': str(venta.apartado.monto_pendiente),
+                'cantidad_cuotas': venta.apartado.cantidad_cuotas,
+                'descripcion': venta.apartado.descripcion,
+                'abonos': [
+                    {
+                        'id': c.id,
+                        'fecha': c.fecha,
+                        'monto': str(c.monto),
+                        'metodo_pago_nombre': c.metodo_pago.nombre if c.metodo_pago else None
+                    } for c in venta.apartado.cuotas.all()
+                ]
+            }
+            clientes_dict[cliente_id]['deudas'].append(deuda)
+    
+    return Response(list(clientes_dict.values()))
+
+
+@api_view(['GET'])
+def deudas_por_pagar_optimizado(request):
+    """
+    Endpoint optimizado para deudas por pagar (proveedores).
+    GET /api/apartado_credito/deudas-por-pagar-optimizado/
+    """
+    compras = Compra.objects.select_related(
+        'proveedor', 'credito', 'credito__estado', 'metodo_pago'
+    ).prefetch_related(
+        'prendas__prenda',
+        Prefetch('credito__cuotas', queryset=Cuota.objects.select_related('metodo_pago'))
+    ).filter(credito__isnull=False)
+    
+    proveedores_dict = {}
+    for compra in compras:
+        proveedor_id = compra.proveedor.id
+        if proveedor_id not in proveedores_dict:
+            proveedores_dict[proveedor_id] = {
+                'proveedor': {
+                    'id': compra.proveedor.id,
+                    'nombre': compra.proveedor.nombre,
+                    'telefono': compra.proveedor.telefono,
+                },
+                'deudas': []
+            }
+        
+        if compra.credito:
+            deuda = {
+                'compra_id': compra.id,
+                'compra': {
+                    'id': compra.id,
+                    'fecha': compra.fecha,
+                    'total': str(compra.total),
+                    'prendas': [
+                        {
+                            'prenda_nombre': p.prenda.nombre,
+                            'cantidad': p.cantidad,
+                            'subtotal': str(p.subtotal)
+                        } for p in compra.prendas.all()
+                    ]
+                },
+                'tipo': 'Crédito',
+                'total': str(compra.total),
+                'cuotas_pendientes': compra.credito.cuotas_pendientes,
+                'fecha_limite': compra.credito.fecha_limite,
+                'estado': compra.credito.estado.nombre if compra.credito.estado else None,
+                'credito_id': compra.credito.id,
+                'monto_pendiente': str(compra.credito.monto_pendiente),
+                'cantidad_cuotas': compra.credito.cantidad_cuotas,
+                'interes': str(compra.credito.interes),
+                'descripcion': compra.credito.descripcion,
+                'abonos': [
+                    {
+                        'id': c.id,
+                        'fecha': c.fecha,
+                        'monto': str(c.monto),
+                        'metodo_pago_nombre': c.metodo_pago.nombre if c.metodo_pago else None
+                    } for c in compra.credito.cuotas.all()
+                ]
+            }
+            proveedores_dict[proveedor_id]['deudas'].append(deuda)
+    
+    return Response(list(proveedores_dict.values()))

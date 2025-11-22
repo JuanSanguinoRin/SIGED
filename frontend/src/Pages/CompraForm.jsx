@@ -27,6 +27,7 @@ const CompraForm = () => {
     interes: "",
     estado: 4, // En proceso por defecto
     fecha_limite: "",
+    descripcion: "",
   });
 
   // --- Cargar datos iniciales ---
@@ -124,6 +125,7 @@ const CompraForm = () => {
           interes: Number(creditoData.interes),
           estado: 4,
           fecha_limite: creditoData.fecha_limite,
+          descripcion: creditoData.descripcion,
         }),
       });
 
@@ -141,7 +143,7 @@ const CompraForm = () => {
     setDescripcion("");
     setItems([{ prenda: "", cantidad: 1, precio_por_gramo: 0 }]);
     setEsCredito(false);
-    setCreditoData({ cantidad_cuotas: "", interes: "", estado: 4, fecha_limite: "" });
+    setCreditoData({ cantidad_cuotas: "", interes: "", estado: 4, fecha_limite: "", descripcion: "" });
 
   } catch (error) {
     setMensaje("❌ Error al registrar la compra");
@@ -286,6 +288,17 @@ const CompraForm = () => {
                   }
                 />
               </div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm text-gray-600 mb-1">Descripción del crédito</label>
+              <textarea
+                className="border p-2 rounded-md w-full"
+                rows="2"
+                value={creditoData.descripcion}
+                onChange={(e) =>
+                  setCreditoData({ ...creditoData, descripcion: e.target.value })
+                }
+              />
             </div>
           </div>
         )}

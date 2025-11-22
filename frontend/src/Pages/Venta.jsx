@@ -26,11 +26,13 @@ const VentaForm = () => {
     cantidad_cuotas: "",
     interes: "",
     fecha_limite: "",
+    descripcion: "",
   });
 
   const [apartadoData, setApartadoData] = useState({
     cantidad_cuotas: "",
     fecha_limite: "",
+    descripcion: "",
   });
 
   const [totales, setTotales] = useState({
@@ -182,7 +184,8 @@ function quantityOrZero(q) {
            interes: Number(creditoData.interes),
            estado: 4,
            fecha_limite: creditoData.fecha_limite,
-           monto_total: totales.totalConInteres,
+           descripcion: creditoData.descripcion,
+          monto_total: totales.totalConInteres,
            monto_pendiente: totales.totalConInteres,
          });
  
@@ -234,8 +237,8 @@ function quantityOrZero(q) {
         credito: false,
         apartado: false,
       });
-      setCreditoData({ cantidad_cuotas: "", interes: "", fecha_limite: "" });
-      setApartadoData({ cantidad_cuotas: "", fecha_limite: "" });
+      setCreditoData({ cantidad_cuotas: "", interes: "", fecha_limite: "", descripcion: "" });
+      setApartadoData({ cantidad_cuotas: "", fecha_limite: "", descripcion: "" });
       setTotales({ totalVenta: 0, totalGanancia: 0, totalConInteres: 0 });
       fetchPrendas();
 
@@ -360,6 +363,15 @@ function quantityOrZero(q) {
               />
             </div>
           </div>
+          <div className="mt-4">
+            <label className="block text-sm font-semibold mb-1">Descripción del crédito</label>
+            <textarea
+              className="border w-full p-2 rounded"
+              rows="2"
+              value={creditoData.descripcion}
+              onChange={e => setCreditoData({ ...creditoData, descripcion: e.target.value })}
+            />
+          </div>
         </div>
       )}
 
@@ -390,6 +402,15 @@ function quantityOrZero(q) {
                     onChange={(e) => setApartadoData({ ...apartadoData, fecha_limite: e.target.value })}
                     />
                 </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 mb-1">Descripción del apartado</label>
+                  <textarea
+                    className="border p-2 rounded-md w-full"
+                    rows="2"
+                    value={apartadoData.descripcion}
+                    onChange={(e) => setApartadoData({ ...apartadoData, descripcion: e.target.value })}
+                  />
                 </div>
             </div>
             )}
