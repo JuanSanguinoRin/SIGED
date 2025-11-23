@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { apiUrl } from "../config/api";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
@@ -11,7 +12,6 @@ const calcularValorCuotaRecomendado = (montoPendiente, cuotasRestantes) => {
   return parseFloat(montoPendiente / cuotasRestantes).toFixed(2);
 };
 
-// Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
   const getEstadoConfig = (estadoNombre) => {
     const nombre = String(estadoNombre || "").toLowerCase();
@@ -41,16 +41,14 @@ const DeudasPagar = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [openProveedorId, setOpenProveedorId] = useState(null);
   const [openDeudaId, setOpenDeudaId] = useState(null);
-
-  // Estado para el filtro activo
+  
   const [filtroEstado, setFiltroEstado] = useState("En Proceso");
 
   const getEstadoNombre = (estado) => {
     if (!estado) return "";
     if (typeof estado === "string") return estado;
     if (typeof estado === "object") return estado.nombre || "";
-
-    // Si es un número (ID), convertirlo al nombre
+    
     if (typeof estado === "number") {
       const estadosMap = {
         1: "Finalizado",
@@ -60,13 +58,13 @@ const DeudasPagar = () => {
       };
       return estadosMap[estado] || "";
     }
-
+    
     return "";
   };
 
   const fetchMetodosPago = async () => {
     try {
-      const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
+      const res = await fetch(`${API_BASE}/api/dominios_comunes/metodos-pago/`);
       if (!res.ok) throw new Error("Error al obtener métodos de pago");
       const data = await res.json();
       setMetodosPago(data);
@@ -79,12 +77,10 @@ const DeudasPagar = () => {
     setLoading(true);
     setError(null);
     try {
-      // ✅ UNA SOLA CONSULTA
-      const res = await fetch(apiUrl("/apartado_credito/deudas-por-pagar-optimizado/"));
+      const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-pagar-optimizado/`);
       if (!res.ok) throw new Error("Error al obtener deudas");
       const data = await res.json();
 
-      // Filtrar por estado
       const filtrado = data
         .map((item) => {
           const deudasFiltradas = item.deudas.filter((d) => {
@@ -111,32 +107,29 @@ const DeudasPagar = () => {
     }
 
     try {
-      // Buscar proveedores por nombre
-      const url = apiUrl(`/terceros/proveedores/buscar_por_nombre/?nombre=${termino}`);
+      setLoading(true);
+      
+      // ✅ CORREGIDO: Usar el endpoint optimizado y filtrar despus
+      const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-pagar-optimizado/`);
+      if (!res.ok) throw new Error("Error al obtener deudas");
+      const todosLosDatos = await res.json();
 
-      const response = await fetch(url);
-      if (response.status === 404) {
-        setProveedoresConDeuda([]);
-        return;
-      }
-      if (!response.ok) throw new Error("Error al buscar proveedores");
+      // Filtrar por término de búsqueda
+      const proveedoresFiltrados = todosLosDatos.filter((item) => {
+        const proveedor = item.proveedor;
+        const nombre = String(proveedor.nombre || "").toLowerCase();
+        
+        return nombre.includes(termino.toLowerCase());
+      });
 
-      const data = await response.json();
-      const lista = Array.isArray(data) ? data : [data];
-
-      const prom = lista.map(async (p) => ({
-        proveedor: p,
-        deudas: await obtenerDeudasPorProveedor(p.id),
-      }));
-      const all = await Promise.all(prom);
-
-      const filtrado = all
+      // Filtrar por estado
+      const filtrado = proveedoresFiltrados
         .map((item) => {
-          const deudasPendientes = item.deudas.filter((d) => {
+          const deudasFiltradas = item.deudas.filter((d) => {
             const estadoNombre = getEstadoNombre(d.estado);
             return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
           });
-          return { proveedor: item.proveedor, deudas: deudasPendientes };
+          return { proveedor: item.proveedor, deudas: deudasFiltradas };
         })
         .filter((it) => it.deudas.length > 0);
 
@@ -144,77 +137,8 @@ const DeudasPagar = () => {
     } catch (err) {
       console.error(err);
       setError(err.message || String(err));
-    }
-  };
-
-  //ESTE METODO DA MUCHOS PROBLEMAS DE RENDIMIENTO, DEBO REEMPLAZARLO CUANDO CLAUDE ME DE NUEVOS TOKENS PIPIPI
-  const obtenerDeudasPorProveedor = async (proveedorId) => {
-    try {
-      const comprasRes = await fetch(
-        apiUrl(`/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedorId}`)
-      );
-      if (!comprasRes.ok) return [];
-      const compras = await comprasRes.json();
-
-      const deudasArr = await Promise.all(
-        compras.map(async (c) => {
-          if (c.credito) {
-            const creditoId = typeof c.credito === "object" ? c.credito.id : c.credito;
-            try {
-              const det = await fetch(
-                apiUrl(`/apartado_credito/creditos/${creditoId}/`)
-              );
-              if (!det.ok) throw new Error("no detalle credito");
-              const credito = await det.json();
-
-              // Obtener cuotas/abonos del crédito
-              const cuotasRes = await fetch(
-                apiUrl(`/apartado_credito/cuotas/?credito=${creditoId}`)
-              );
-              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
-
-              return {
-                compra_id: c.id,
-                compra: c,
-                tipo: "Crédito",
-                total: c.total,
-                cuotas_pendientes: credito.cuotas_pendientes,
-                fecha_limite: credito.fecha_limite,
-                estado:
-                  getEstadoNombre(credito.estado_detalle) ||
-                  getEstadoNombre(credito.estado) ||
-                  getEstadoNombre(credito.estado_nombre),
-                credito_id: credito.id,
-                monto_pendiente: credito.monto_pendiente ?? null,
-                cantidad_cuotas: credito.cantidad_cuotas,
-                interes: credito.interes,
-                descripcion: credito.descripcion,
-                abonos: cuotas,
-              };
-            } catch (e) {
-              return {
-                compra_id: c.id,
-                compra: c,
-                tipo: "Crédito",
-                total: c.total,
-                cuotas_pendientes: c.credito?.cuotas_pendientes ?? null,
-                fecha_limite: c.credito?.fecha_limite ?? null,
-                estado: c.credito?.estado || null,
-                credito_id: creditoId,
-                monto_pendiente: c.credito?.monto_pendiente ?? null,
-                abonos: [],
-              };
-            }
-          } else {
-            return null;
-          }
-        })
-      );
-
-      return deudasArr.filter(Boolean);
-    } catch (err) {
-      console.error("Error obtenerDeudasPorProveedor:", err);
-      return [];
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -251,7 +175,7 @@ const DeudasPagar = () => {
     };
 
     try {
-      const res = await fetch(apiUrl("/apartado_credito/cuotas/"), {
+      const res = await fetch(`${API_BASE}/api/apartado_credito/cuotas/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -265,20 +189,17 @@ const DeudasPagar = () => {
         throw new Error(msg);
       }
 
-      // Obtener el detalle actualizado
       let detalleActualizado = null;
       const det = await fetch(
-        apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/`)
+        `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/`
       );
       detalleActualizado = det.ok ? await det.json() : null;
 
-      // Obtener cuotas actualizadas
       const cuotasRes = await fetch(
-        apiUrl(`/apartado_credito/cuotas/?credito=${deuda.credito_id}`)
+        `${API_BASE}/api/apartado_credito/cuotas/?credito=${deuda.credito_id}`
       );
       const cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
 
-      // Actualizar el estado local
       setProveedoresConDeuda((prev) =>
         prev
           .map((item) => {
@@ -289,7 +210,6 @@ const DeudasPagar = () => {
                   detalleActualizado?.monto_pendiente ??
                   (d.monto_pendiente != null ? Math.max(0, d.monto_pendiente - parsed) : null);
 
-                // Obtener el estado actualizado del backend
                 const estadoActualizado = getEstadoNombre(
                   detalleActualizado?.estado_detalle ||
                   detalleActualizado?.estado ||
@@ -341,7 +261,7 @@ const DeudasPagar = () => {
     }
 
     try {
-      const url = apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/cancelar/`);
+      const url = `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/cancelar/`;
 
       const res = await fetch(url, {
         method: "POST",
@@ -355,17 +275,16 @@ const DeudasPagar = () => {
       }
 
       const data = await res.json();
-
-      // Actualizar la lista local eliminando la deuda cancelada
+      
       setProveedoresConDeuda((prev) =>
         prev
           .map((item) => {
             if (item.proveedor.id !== proveedor.id) return item;
-
+            
             const deudasActualizadas = item.deudas.filter(
               (d) => !(d.compra_id === deuda.compra_id && d.tipo === deuda.tipo)
             );
-
+            
             return { ...item, deudas: deudasActualizadas };
           })
           .filter((item) => item.deudas.length > 0)
@@ -378,20 +297,16 @@ const DeudasPagar = () => {
     }
   };
 
-  // useEffect para cargar datos iniciales
   useEffect(() => {
     fetchAllProveedoresAndFilter();
     fetchMetodosPago();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado]);
 
-  // useEffect para el debounce de búsqueda
   useEffect(() => {
     const t = setTimeout(() => {
       handleBuscar(searchTerm);
     }, 350);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, filtroEstado]);
 
   if (loading) {
@@ -420,7 +335,6 @@ const DeudasPagar = () => {
         </h1>
       </div>
 
-      {/* Botones de filtro por estado */}
       <div className="mb-6 flex flex-wrap gap-3">
         <button
           onClick={() => setFiltroEstado("En Proceso")}
@@ -484,7 +398,6 @@ const DeudasPagar = () => {
               key={proveedor.id}
               className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
             >
-              {/* Header del proveedor */}
               <div
                 className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
                 onClick={() =>
@@ -520,7 +433,6 @@ const DeudasPagar = () => {
                 </div>
               </div>
 
-              {/* Lista de deudas */}
               {openProveedorId === proveedor.id && (
                 <div className="p-4 bg-white">
                   <div className="flex flex-col gap-3">
@@ -533,7 +445,6 @@ const DeudasPagar = () => {
                           key={deudaKey}
                           className="border border-gray-200 rounded-lg overflow-hidden"
                         >
-                          {/* Header de la deuda */}
                           <div
                             className="p-3 bg-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
                             onClick={() =>
@@ -542,9 +453,7 @@ const DeudasPagar = () => {
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-700 truncate">
-                                {`Compra #${deuda.compra_id}${
-                                  deuda.descripcion ? ` — ${deuda.descripcion}` : ""
-                                }`}
+                                {deuda.descripcion || `Compra #${deuda.compra_id}`}
                               </p>
                             </div>
                             <div className="flex items-center gap-3 ml-4">
@@ -566,11 +475,9 @@ const DeudasPagar = () => {
                             </div>
                           </div>
 
-                          {/* Detalle de la deuda */}
                           {isDeudaOpen && (
                             <div className="p-4 bg-white">
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Columna izquierda */}
                                 <div className="space-y-4">
                                   <div className="space-y-2">
                                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -598,7 +505,6 @@ const DeudasPagar = () => {
                                     )}
                                   </div>
 
-                                  {/* Prendas incluidas */}
                                   {deuda.compra?.prendas && deuda.compra.prendas.length > 0 && (
                                     <div>
                                       <h4 className="text-sm font-semibold text-gray-700 mb-2">
@@ -634,7 +540,6 @@ const DeudasPagar = () => {
                                   )}
                                 </div>
 
-                                {/* Columna derecha - Montos */}
                                 <div className="space-y-4">
                                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -660,7 +565,6 @@ const DeudasPagar = () => {
                                     </div>
                                   </div>
 
-                                  {/* Abonos realizados */}
                                   <div>
                                     <h4 className="text-sm font-semibold text-gray-700 mb-2">
                                       Historial de Abonos
@@ -715,7 +619,6 @@ const DeudasPagar = () => {
                                 </div>
                               </div>
 
-                              {/* Botones de acción */}
                               <div className="mt-6 flex gap-3 justify-end border-t border-gray-200 pt-4">
                                 <button
                                   onClick={() => handleCancelarDeuda(proveedor, deuda)}
@@ -743,7 +646,6 @@ const DeudasPagar = () => {
         </div>
       )}
 
-      {/* Modal de Abono */}
       {abonoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
           <div className="bg-white rounded-lg w-full max-w-lg p-6 shadow-xl">
@@ -796,7 +698,7 @@ const DeudasPagar = () => {
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
 
-                {abonoModal.deuda?.monto_pendiente &&
+              {abonoModal.deuda?.monto_pendiente &&
                     abonoModal.deuda?.cuotas_pendientes > 0 && (
                       <div className="mt-2 text-sm text-blue-600 font-medium">
                         Recomendado por cuota: $
@@ -808,6 +710,7 @@ const DeudasPagar = () => {
                         ).toLocaleString()}
                       </div>
                     )}
+
 
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Método de Pago
