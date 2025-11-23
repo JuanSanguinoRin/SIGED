@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { apiUrl } from "../config/api";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
@@ -14,7 +15,6 @@ const calcularValorCuotaRecomendado = (montoPendiente, cuotasRestantes) => {
 // Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
   const getEstadoConfig = (estadoNombre) => {
-    // Convertir a string si es necesario
     const nombre = String(estadoNombre || "").toLowerCase();
     if (nombre === "finalizado") return { color: "bg-gray-100 text-gray-700", text: "Finalizado" };
     if (nombre === "en proceso") return { color: "bg-green-100 text-green-700", text: "En Proceso" };
@@ -22,8 +22,6 @@ const EstadoBadge = ({ estado }) => {
     if (nombre === "caducado") return { color: "bg-orange-100 text-orange-700", text: "Caducado" };
     return { color: "bg-gray-100 text-gray-500", text: estado || "—" };
   };
-
-  
 
   const config = getEstadoConfig(estado);
   return (
@@ -44,7 +42,7 @@ const DeudasCobrar = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [openClientId, setOpenClientId] = useState(null);
   const [openDeudaId, setOpenDeudaId] = useState(null);
-
+  
   // Estado para el filtro activo
   const [filtroEstado, setFiltroEstado] = useState("En Proceso");
 
@@ -52,7 +50,7 @@ const DeudasCobrar = () => {
     if (!estado) return "";
     if (typeof estado === "string") return estado;
     if (typeof estado === "object") return estado.nombre || "";
-
+    
     // Si es un número (ID), convertirlo al nombre
     if (typeof estado === "number") {
       const estadosMap = {
@@ -63,13 +61,13 @@ const DeudasCobrar = () => {
       };
       return estadosMap[estado] || "";
     }
-
+    
     return "";
   };
 
   const fetchMetodosPago = async () => {
     try {
-      const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
+      const res = await fetch(`${API_BASE}/api/dominios_comunes/metodos-pago/`);
       if (!res.ok) throw new Error("Error al obtener métodos de pago");
       const data = await res.json();
       setMetodosPago(data);
@@ -82,29 +80,30 @@ const DeudasCobrar = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl("/terceros/clientes/"));
-      if (!res.ok) throw new Error("Error al obtener clientes");
+      // ✅ UNA SOLA CONSULTA
+      const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-cobrar-optimizado/`);
+      if (!res.ok) throw new Error("Error al obtener deudas");
       const data = await res.json();
 
-    // Filtrar por estado
-    const filtrado = data
-      .map((item) => {
-        const deudasFiltradas = item.deudas.filter((d) => {
-          const estadoNombre = getEstadoNombre(d.estado);
-          return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
-        });
-        return { cliente: item.cliente, deudas: deudasFiltradas };
-      })
-      .filter((it) => it.deudas.length > 0);
+      // Filtrar por estado
+      const filtrado = data
+        .map((item) => {
+          const deudasFiltradas = item.deudas.filter((d) => {
+            const estadoNombre = getEstadoNombre(d.estado);
+            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
+          });
+          return { cliente: item.cliente, deudas: deudasFiltradas };
+        })
+        .filter((it) => it.deudas.length > 0);
 
-    setClientesConDeuda(filtrado);
-  } catch (err) {
-    console.error(err);
-    setError(err.message || String(err));
-  } finally {
-    setLoading(false);
-  }
-};
+      setClientesConDeuda(filtrado);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBuscar = async (termino) => {
     if (!termino) {
@@ -113,37 +112,36 @@ const DeudasCobrar = () => {
     }
 
     try {
-      let url = "";
-      if (/^\d+$/.test(termino)) {
-        url = apiUrl(`/terceros/clientes/buscar_por_cedula/?cedula=${termino}`);
-      } else {
-        url = apiUrl(`/terceros/clientes/buscar_por_nombre/?nombre=${termino}`);
-      }
+      setLoading(true);
+      
+      // ✅ CORREGIDO: Usar el endpoint optimizado y filtrar después
+      const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-cobrar-optimizado/`);
+      if (!res.ok) throw new Error("Error al obtener deudas");
+      const todosLosDatos = await res.json();
 
-      const response = await fetch(url);
-      if (response.status === 404) {
-        setClientesConDeuda([]);
-        return;
-      }
-      if (!response.ok) throw new Error("Error al buscar clientes");
+      // Filtrar por término de búsqueda
+      const clientesFiltrados = todosLosDatos.filter((item) => {
+        const cliente = item.cliente;
+        const nombreCompleto = (
+          cliente.nombre ||
+          cliente.razon_social ||
+          `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim()
+        ).toLowerCase();
+        
+        const cedula = String(cliente.cedula || cliente.identificacion || "");
+        
+        return nombreCompleto.includes(termino.toLowerCase()) || 
+               cedula.includes(termino);
+      });
 
-      const data = await response.json();
-      const lista = Array.isArray(data) ? data : [data];
-
-      const prom = lista.map(async (c) => ({
-        cliente: c,
-        deudas: await obtenerDeudasPorCliente(c.id),
-      }));
-      const all = await Promise.all(prom);
-
-      const filtrado = all
+      // Filtrar por estado
+      const filtrado = clientesFiltrados
         .map((item) => {
-          const deudasPendientes = item.deudas.filter((d) => {
+          const deudasFiltradas = item.deudas.filter((d) => {
             const estadoNombre = getEstadoNombre(d.estado);
-            // Filtrar por el estado seleccionado
             return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
           });
-          return { cliente: item.cliente, deudas: deudasPendientes };
+          return { cliente: item.cliente, deudas: deudasFiltradas };
         })
         .filter((it) => it.deudas.length > 0);
 
@@ -151,122 +149,8 @@ const DeudasCobrar = () => {
     } catch (err) {
       console.error(err);
       setError(err.message || String(err));
-    }
-  };
-
-  const obtenerDeudasPorCliente = async (clienteId) => {
-    try {
-      const ventasRes = await fetch(
-        apiUrl(`/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`)
-      );
-      if (!ventasRes.ok) return [];
-      const ventas = await ventasRes.json();
-
-      const deudasArr = await Promise.all(
-        ventas.map(async (v) => {
-          if (v.credito) {
-            const creditoId = typeof v.credito === "object" ? v.credito.id : v.credito;
-            try {
-              const det = await fetch(
-                apiUrl(`/apartado_credito/creditos/${creditoId}/`)
-              );
-              if (!det.ok) throw new Error("no detalle credito");
-              const crédito = await det.json();
-
-              // Obtener cuotas/abonos del crédito
-              const cuotasRes = await fetch(
-                apiUrl(`/apartado_credito/cuotas/?credito=${creditoId}`)
-              );
-              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
-
-              return {
-                venta_id: v.id,
-                venta: v,
-                tipo: "Crédito",
-                total: v.total,
-                cuotas_pendientes: crédito.cuotas_pendientes,
-                fecha_limite: crédito.fecha_limite,
-                estado:
-                  getEstadoNombre(crédito.estado_detalle) ||
-                  getEstadoNombre(crédito.estado) ||
-                  getEstadoNombre(crédito.estado_nombre),
-                credito_id: crédito.id,
-                monto_pendiente: crédito.monto_pendiente ?? null,
-                cantidad_cuotas: crédito.cantidad_cuotas,
-                interes: crédito.interes,
-                descripcion: crédito.descripcion,
-                abonos: cuotas,
-              };
-            } catch (e) {
-              return {
-                venta_id: v.id,
-                venta: v,
-                tipo: "Crédito",
-                total: v.total,
-                cuotas_pendientes: v.credito?.cuotas_pendientes ?? null,
-                fecha_limite: v.credito?.fecha_limite ?? null,
-                estado: v.credito?.estado || null,
-                credito_id: creditoId,
-                monto_pendiente: v.credito?.monto_pendiente ?? null,
-                abonos: [],
-              };
-            }
-          } else if (v.apartado) {
-            const apartadoId = typeof v.apartado === "object" ? v.apartado.id : v.apartado;
-            try {
-              const det = await fetch(
-                apiUrl(`/apartado_credito/apartados/${apartadoId}/`)
-              );
-              if (!det.ok) throw new Error("no detalle apartado");
-              const apartado = await det.json();
-
-              // Obtener cuotas/abonos del apartado
-              const cuotasRes = await fetch(
-                apiUrl(`/apartado_credito/cuotas/?apartado=${apartadoId}`)
-              );
-              const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
-
-              return {
-                venta_id: v.id,
-                venta: v,
-                tipo: "Apartado",
-                total: v.total,
-                cuotas_pendientes: apartado.cuotas_pendientes,
-                fecha_limite: apartado.fecha_limite,
-                estado:
-                  getEstadoNombre(apartado.estado_detalle) ||
-                  getEstadoNombre(apartado.estado) ||
-                  getEstadoNombre(apartado.estado_nombre),
-                apartado_id: apartado.id,
-                monto_pendiente: apartado.monto_pendiente ?? null,
-                cantidad_cuotas: apartado.cantidad_cuotas,
-                descripcion: apartado.descripcion,
-                abonos: cuotas,
-              };
-            } catch (e) {
-              return {
-                venta_id: v.id,
-                venta: v,
-                tipo: "Apartado",
-                total: v.total,
-                cuotas_pendientes: v.apartado?.cuotas_pendientes ?? null,
-                fecha_limite: v.apartado?.fecha_limite ?? null,
-                estado: v.apartado?.estado ?? null,
-                apartado_id: apartadoId,
-                monto_pendiente: v.apartado?.monto_pendiente ?? null,
-                abonos: [],
-              };
-            }
-          } else {
-            return null;
-          }
-        })
-      );
-
-      return deudasArr.filter(Boolean);
-    } catch (err) {
-      console.error("Error obtenerDeudasPorCliente:", err);
-      return [];
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -308,7 +192,7 @@ const DeudasCobrar = () => {
     if (deuda.apartado_id) payload.apartado = deuda.apartado_id;
 
     try {
-      const res = await fetch(apiUrl("/apartado_credito/cuotas/"), {
+      const res = await fetch(`${API_BASE}/api/apartado_credito/cuotas/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -326,12 +210,12 @@ const DeudasCobrar = () => {
       let detalleActualizado = null;
       if (deuda.credito_id) {
         const det = await fetch(
-          apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/`)
+          `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/`
         );
         detalleActualizado = det.ok ? await det.json() : null;
       } else if (deuda.apartado_id) {
         const det = await fetch(
-          apiUrl(`/apartado_credito/apartados/${deuda.apartado_id}/`)
+          `${API_BASE}/api/apartado_credito/apartados/${deuda.apartado_id}/`
         );
         detalleActualizado = det.ok ? await det.json() : null;
       }
@@ -340,12 +224,12 @@ const DeudasCobrar = () => {
       let cuotasActualizadas = [];
       if (deuda.credito_id) {
         const cuotasRes = await fetch(
-          apiUrl(`/apartado_credito/cuotas/?credito=${deuda.credito_id}`)
+          `${API_BASE}/api/apartado_credito/cuotas/?credito=${deuda.credito_id}`
         );
         cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
       } else if (deuda.apartado_id) {
         const cuotasRes = await fetch(
-          apiUrl(`/apartado_credito/cuotas/?apartado=${deuda.apartado_id}`)
+          `${API_BASE}/api/apartado_credito/cuotas/?apartado=${deuda.apartado_id}`
         );
         cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
       }
@@ -361,7 +245,6 @@ const DeudasCobrar = () => {
                   detalleActualizado?.monto_pendiente ??
                   (d.monto_pendiente != null ? Math.max(0, d.monto_pendiente - parsed) : null);
 
-                // Obtener el estado actualizado del backend
                 const estadoActualizado = getEstadoNombre(
                   detalleActualizado?.estado_detalle ||
                   detalleActualizado?.estado ||
@@ -377,9 +260,8 @@ const DeudasCobrar = () => {
                       : null),
                   monto_pendiente: montoPendienteActual,
                   estado: estadoActualizado,
-                  abonos: cuotasActualizadas, // ← Actualizar historial de abonos
+                  abonos: cuotasActualizadas,
                 };
-                
               }
               return d;
             });
@@ -389,7 +271,6 @@ const DeudasCobrar = () => {
             ...item,
             deudas: item.deudas.filter((d) => {
               const estadoNombre = getEstadoNombre(d.estado);
-              // Filtrar por el estado seleccionado actualmente
               return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
             }),
           }))
@@ -417,9 +298,9 @@ const DeudasCobrar = () => {
     try {
       let url = "";
       if (deuda.credito_id) {
-        url = apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/cancelar/`);
+        url = `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/cancelar/`;
       } else if (deuda.apartado_id) {
-        url = apiUrl(`/apartado_credito/apartados/${deuda.apartado_id}/cancelar/`);
+        url = `${API_BASE}/api/apartado_credito/apartados/${deuda.apartado_id}/cancelar/`;
       } else {
         alert("Error: No se pudo identificar el tipo de deuda");
         return;
@@ -437,18 +318,16 @@ const DeudasCobrar = () => {
       }
 
       const data = await res.json();
-
-      // Actualizar la lista local eliminando la deuda cancelada
+      
       setClientesConDeuda((prev) =>
         prev
           .map((item) => {
             if (item.cliente.id !== cliente.id) return item;
-
-            // Filtrar la deuda cancelada
+            
             const deudasActualizadas = item.deudas.filter(
               (d) => !(d.venta_id === deuda.venta_id && d.tipo === deuda.tipo)
             );
-
+            
             return { ...item, deudas: deudasActualizadas };
           })
           .filter((item) => item.deudas.length > 0)
@@ -461,21 +340,17 @@ const DeudasCobrar = () => {
     }
   };
 
-  // useEffect para cargar datos iniciales
   useEffect(() => {
     fetchAllClientesAndFilter();
     fetchMetodosPago();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado]); // ← Recargar cuando cambie el filtro
+  }, [filtroEstado]);
 
-  // useEffect para el debounce de búsqueda
   useEffect(() => {
     const t = setTimeout(() => {
       handleBuscar(searchTerm);
     }, 350);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filtroEstado]); // ← También depende del filtro
+  }, [searchTerm, filtroEstado]);
 
   if (loading) {
     return (
@@ -503,41 +378,44 @@ const DeudasCobrar = () => {
         </h1>
       </div>
 
-      {/* Botones de filtro por estado */}
       <div className="mb-6 flex flex-wrap gap-3">
         <button
           onClick={() => setFiltroEstado("En Proceso")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "En Proceso"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "En Proceso"
               ? "bg-green-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+          }`}
         >
           En Proceso
         </button>
         <button
           onClick={() => setFiltroEstado("Finalizado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Finalizado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Finalizado"
               ? "bg-gray-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+          }`}
         >
           Finalizados
         </button>
         <button
           onClick={() => setFiltroEstado("Cancelado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Cancelado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Cancelado"
               ? "bg-red-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+          }`}
         >
           Cancelados
         </button>
         <button
           onClick={() => setFiltroEstado("Caducado")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${filtroEstado === "Caducado"
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            filtroEstado === "Caducado"
               ? "bg-orange-500 text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+          }`}
         >
           Caducados
         </button>
@@ -563,7 +441,6 @@ const DeudasCobrar = () => {
               key={cliente.id}
               className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
             >
-              {/* Header del cliente */}
               <div
                 className="p-4 bg-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
                 onClick={() =>
@@ -601,7 +478,6 @@ const DeudasCobrar = () => {
                 </div>
               </div>
 
-              {/* Lista de deudas */}
               {openClientId === cliente.id && (
                 <div className="p-4 bg-white">
                   <div className="flex flex-col gap-3">
@@ -614,7 +490,6 @@ const DeudasCobrar = () => {
                           key={deudaKey}
                           className="border border-gray-200 rounded-lg overflow-hidden"
                         >
-                          {/* Header de la deuda */}
                           <div
                             className="p-3 bg-gray-50 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
                             onClick={() =>
@@ -623,9 +498,7 @@ const DeudasCobrar = () => {
                           >
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-700 truncate">
-                                {`Venta #${deuda.venta_id}${
-                                  deuda.descripcion ? ` — ${deuda.descripcion}` : ""
-                                }`}
+                                {deuda.descripcion || `Venta #${deuda.venta_id}`}
                               </p>
                             </div>
                             <div className="flex items-center gap-3 ml-4">
@@ -647,11 +520,9 @@ const DeudasCobrar = () => {
                             </div>
                           </div>
 
-                          {/* Detalle de la deuda */}
                           {isDeudaOpen && (
                             <div className="p-4 bg-white">
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Columna izquierda - Información general */}
                                 <div className="space-y-4">
                                   <div className="space-y-2">
                                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -679,7 +550,6 @@ const DeudasCobrar = () => {
                                     )}
                                   </div>
 
-                                  {/* Prendas incluidas */}
                                   {deuda.venta?.prendas && deuda.venta.prendas.length > 0 && (
                                     <div>
                                       <h4 className="text-sm font-semibold text-gray-700 mb-2">
@@ -715,7 +585,6 @@ const DeudasCobrar = () => {
                                   )}
                                 </div>
 
-                                {/* Columna derecha - Montos */}
                                 <div className="space-y-4">
                                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -741,7 +610,6 @@ const DeudasCobrar = () => {
                                     </div>
                                   </div>
 
-                                  {/* Abonos realizados */}
                                   <div>
                                     <h4 className="text-sm font-semibold text-gray-700 mb-2">
                                       Historial de Abonos
@@ -796,7 +664,6 @@ const DeudasCobrar = () => {
                                 </div>
                               </div>
 
-                              {/* Botones de acción */}
                               <div className="mt-6 flex gap-3 justify-end border-t border-gray-200 pt-4">
                                 <button
                                   onClick={() => handleCancelarDeuda(cliente, deuda)}
@@ -824,7 +691,6 @@ const DeudasCobrar = () => {
         </div>
       )}
 
-      {/* Modal de Abono */}
       {abonoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
           <div className="bg-white rounded-lg w-full max-w-lg p-6 shadow-xl">
@@ -876,9 +742,7 @@ const DeudasCobrar = () => {
               placeholder="Ingrese el monto"
               className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-
-
-            {abonoModal.deuda?.monto_pendiente &&
+                {abonoModal.deuda?.monto_pendiente &&
                 abonoModal.deuda?.cuotas_pendientes > 0 && (
                   <div className="mt-2 text-sm text-blue-600 font-medium">
                     Recomendado por cuota: $
@@ -890,7 +754,6 @@ const DeudasCobrar = () => {
                     ).toLocaleString()}
                   </div>
                 )}
-
 
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Método de Pago
