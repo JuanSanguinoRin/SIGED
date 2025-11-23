@@ -18,6 +18,10 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         Filtra por proveedores archivados o no según el parámetro.
         Ejemplo: ?archivado=true
         """
+        # 🔹 Para las acciones de archivar/desarchivar, devolver TODOS
+        if self.action in ['archivar', 'desarchivar']:
+            return Proveedor.objects.all()
+        
         archivado = self.request.query_params.get("archivado", "false").lower()
         if archivado == "true":
             return Proveedor.objects.filter(archivado=True)
@@ -59,7 +63,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
             "mensaje": "Proveedor archivado correctamente.",
             "archivado": proveedor.archivado
         }, status=status.HTTP_200_OK)
-
+    
     # 🗃️ Desarchivar proveedor
     @action(detail=True, methods=['patch'], url_path='desarchivar')
     def desarchivar(self, request, pk=None):
@@ -81,6 +85,10 @@ class ClienteViewSet(viewsets.ModelViewSet):
     serializer_class = ClienteSerializer
 
     def get_queryset(self):
+        # 🔹 Para las acciones de archivar/desarchivar, devolver TODOS
+        if self.action in ['archivar', 'desarchivar']:
+            return Cliente.objects.all()
+        
         archivado = self.request.query_params.get("archivado", "false").lower()
         if archivado == "true":
             return Cliente.objects.filter(archivado=True)

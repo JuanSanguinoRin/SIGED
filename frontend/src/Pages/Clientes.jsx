@@ -14,14 +14,19 @@ const Clientes = () => {
   const [error, setError] = useState(null);
   const [modalCliente, setModalCliente] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
 
   useEffect(() => {
     fetchClientes();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarArchivados]);
 
   const fetchClientes = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(apiUrl("/terceros/clientes/"));
+      const response = await fetch(
+        apiUrl(`terceros/clientes/?archivado=${mostrarArchivados}`)
+      );
       if (!response.ok) throw new Error("Error al obtener clientes");
       const data = await response.json();
       setClientes(data);
@@ -41,9 +46,9 @@ const Clientes = () => {
     try {
       let url = "";
       if (/^\d+$/.test(termino)) {
-        url = apiUrl(`/terceros/clientes/buscar_por_cedula/?cedula=${termino}`);
+        url = apiUrl(`terceros/clientes/buscar_por_cedula/?cedula=${termino}`);
       } else {
-        url = apiUrl(`/terceros/clientes/buscar_por_nombre/?nombre=${termino}`);
+        url = apiUrl(`terceros/clientes/buscar_por_nombre/?nombre=${termino}`);
       }
 
       const response = await fetch(url);
@@ -69,6 +74,7 @@ const Clientes = () => {
     }, 400);
 
     return () => clearTimeout(delayDebounce);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
   const handleSelect = async (clienteId) => {
@@ -79,8 +85,8 @@ const Clientes = () => {
 
     try {
       const [detalleRes, ventasRes] = await Promise.all([
-        fetch(apiUrl(`/terceros/clientes/${clienteId}/`)),
-        fetch(apiUrl(`/compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`)),
+        fetch(apiUrl(`terceros/clientes/${clienteId}/`)),
+        fetch(apiUrl(`compra_venta/ventas/por-cliente-id/?cliente_id=${clienteId}`)),
       ]);
 
       if (!detalleRes.ok) throw new Error("Error al obtener detalle del cliente");
@@ -113,6 +119,49 @@ const Clientes = () => {
     setIsCreating(false);
   };
 
+  // Archivar / Desarchivar cliente
+  const handleArchive = async (cliente) => {
+    try {
+      const endpoint = apiUrl(`terceros/clientes/${cliente.id}/${
+        mostrarArchivados ? 'desarchivar' : 'archivar'
+      }/`);
+
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error response:', errorData);
+        throw new Error(
+          mostrarArchivados
+            ? 'Error al desarchivar cliente'
+            : 'Error al archivar cliente'
+        );
+      }
+
+      const data = await response.json();
+      
+      await fetchClientes();
+      
+      if (selectedClient?.id === cliente.id) {
+        setSelectedClient(null);
+      }
+
+      alert(data.mensaje || 'Operación completada');
+    } catch (err) {
+      console.error('Error completo:', err);
+      alert(
+        mostrarArchivados
+          ? 'No se pudo desarchivar el cliente'
+          : 'No se pudo archivar el cliente'
+      );
+    }
+  };
+
   // Guardar cliente (crear o actualizar)
   const handleSave = (clienteActualizado) => {
     if (isCreating) {
@@ -143,22 +192,38 @@ const Clientes = () => {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Gestión de Clientes</h1>
+    <div className="p-6 max-w-6xl mx-auto relative">
+      <div className="absolute right-4 top-6 flex gap-3">
         <button
           onClick={handleCreateClick}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center gap-2"
+          className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition flex items-center gap-2"
+          title="Crear cliente"
         >
           <span className="text-xl">+</span>
-          Crear Cliente
+          Crear
+        </button>
+
+        <button
+          onClick={() => setMostrarArchivados((s) => !s)}
+          className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition"
+          title={mostrarArchivados ? "Ver clientes activos" : "Ver clientes archivados"}
+        >
+          {mostrarArchivados ? "Ver activos" : "Archivados"}
         </button>
       </div>
 
-      <ClientSearchBar searchTerm={searchTerm} onSearch={setSearchTerm} />
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Clientes</h1>
+
+      <ClientSearchBar 
+        searchTerm={searchTerm} 
+        onSearch={setSearchTerm}
+        placeholder={mostrarArchivados ? "Buscar clientes archivados..." : "Buscar cliente..."}
+      />
 
       {clientes.length === 0 ? (
-        <p className="text-center text-gray-500 mt-6">No se encontraron clientes.</p>
+        <p className="text-center text-gray-500 mt-6">
+          {mostrarArchivados ? "No hay clientes archivados." : "No se encontraron clientes."}
+        </p>
       ) : (
         <div className="flex flex-col gap-4 mt-6">
           {clientes.map((cliente) => (
@@ -171,6 +236,8 @@ const Clientes = () => {
                 isOpen={selectedClient?.id === cliente.id}
                 onSelect={handleSelect}
                 onEdit={handleEdit}
+                onArchive={handleArchive}
+                mostrarArchivados={mostrarArchivados}
               />
 
               {selectedClient?.id === cliente.id && (

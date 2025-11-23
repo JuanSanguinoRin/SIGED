@@ -1,8 +1,6 @@
-"use client";
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { apiUrl } from "../config/api";
+import React, { useState, useEffect } from "react";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
+import { apiUrl } from "../config/api";
 
 
 const CompraForm = () => {
@@ -18,16 +16,12 @@ const CompraForm = () => {
   const [mensaje, setMensaje] = useState(null);
   const [mostrarModalPrenda, setMostrarModalPrenda] = useState(false);
 
-
-  const BASE_URL = "http://127.0.0.1:8000/api/";
-
   const [esCredito, setEsCredito] = useState(false);
   const [creditoData, setCreditoData] = useState({
     cantidad_cuotas: "",
     interes: "",
     estado: 4, // En proceso por defecto
     fecha_limite: "",
-    descripcion: "",
   });
 
   // --- Cargar datos iniciales ---
@@ -35,9 +29,9 @@ const CompraForm = () => {
     const fetchData = async () => {
       try {
         const [provRes, metRes, preRes] = await Promise.all([
-          fetchProveedores(),
-          fetchMetodosPago(),
-          fetchPrendas(),
+          fetch(apiUrl("terceros/proveedores/")),
+          fetch(apiUrl("dominios_comunes/metodos-pago/")),
+          fetch(apiUrl("prendas/prendas/")),
         ]);
         const [prov, met, pre] = await Promise.all([
           provRes.json(),
@@ -53,21 +47,6 @@ const CompraForm = () => {
     };
     fetchData();
   }, []);
-
-  const fetchPrendas = async () => {
-    const res = await axios.get(apiUrl("/prendas/prendas/"));
-    return res.data;
-  };
-
-  const fetchProveedores = async () => {
-    const res = await fetch(apiUrl("/terceros/proveedores/"));
-    return res.json();
-  };
-
-  const fetchMetodosPago = async () => {
-    const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
-    return res.json();
-  };
 
   // --- Calcular totales ---
   const calcularSubtotal = (item) => {
@@ -116,7 +95,7 @@ const CompraForm = () => {
   try {
     // 🔹 Si es crédito, crear el crédito primero
     if (esCredito) {
-      const creditoRes = await fetch(`${BASE_URL}apartado_credito/creditos/`, {
+      const creditoRes = await fetch(apiUrl("apartado_credito/creditos/"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,7 +104,6 @@ const CompraForm = () => {
           interes: Number(creditoData.interes),
           estado: 4,
           fecha_limite: creditoData.fecha_limite,
-          descripcion: creditoData.descripcion,
         }),
       });
 
@@ -135,7 +113,17 @@ const CompraForm = () => {
     }
 
     // 🔹 Crear la compra
-    await axios.post(apiUrl("/compra_venta/ventas/"), payload);
+    const response = await fetch(apiUrl("compra_venta/compras/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error:", errorData);
+      throw new Error("Error al registrar la compra");
+    }
 
     setMensaje("✅ Compra registrada correctamente");
     setSelectedProveedor("");
@@ -143,7 +131,7 @@ const CompraForm = () => {
     setDescripcion("");
     setItems([{ prenda: "", cantidad: 1, precio_por_gramo: 0 }]);
     setEsCredito(false);
-    setCreditoData({ cantidad_cuotas: "", interes: "", estado: 4, fecha_limite: "", descripcion: "" });
+    setCreditoData({ cantidad_cuotas: "", interes: "", estado: 4, fecha_limite: "" });
 
   } catch (error) {
     setMensaje("❌ Error al registrar la compra");
@@ -288,17 +276,6 @@ const CompraForm = () => {
                   }
                 />
               </div>
-            </div>
-            <div className="mt-4">
-              <label className="block text-sm text-gray-600 mb-1">Descripción del crédito</label>
-              <textarea
-                className="border p-2 rounded-md w-full"
-                rows="2"
-                value={creditoData.descripcion}
-                onChange={(e) =>
-                  setCreditoData({ ...creditoData, descripcion: e.target.value })
-                }
-              />
             </div>
           </div>
         )}

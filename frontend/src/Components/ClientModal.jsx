@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { apiUrl } from "../config/api";
 
 const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -7,7 +8,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
     cedula: "",
     telefono: "",
     direccion: "",
-    email: "",  // ✅ Cambiar "correo" por "email"
+    email: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
         cedula: cliente.cedula || "",
         telefono: cliente.telefono || "",
         direccion: cliente.direccion || "",
-        correo: cliente.correo || "",
+        email: cliente.email || "",
       });
     } else {
       // Modo creación: limpiar formulario
@@ -30,7 +31,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
         cedula: "",
         telefono: "",
         direccion: "",
-        correo: "",
+        email: "",
       });
     }
     setError(null);
@@ -52,8 +53,8 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
     try {
       const method = isCreating ? "POST" : "PUT";
       const url = isCreating
-        ? "http://127.0.0.1:8000/api/terceros/clientes/"
-        : `http://127.0.0.1:8000/api/terceros/clientes/${cliente.id}/`;
+        ? apiUrl("terceros/clientes/")
+        : apiUrl(`terceros/clientes/${cliente.id}/`);
 
       const response = await fetch(url, {
         method,
@@ -71,6 +72,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
       const data = await response.json();
       onSave(data);
       onClose();
+      alert(`✅ Cliente ${isCreating ? "creado" : "actualizado"} correctamente`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,8 +81,8 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 p-6">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-lg max-w-md w-full mx-4 p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-800">
@@ -106,7 +108,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
               name="nombre"
               value={formData.nombre}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Nombre completo"
               required
             />
@@ -122,7 +124,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
               name="cedula"
               value={formData.cedula}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Ej: 60111111"
               required
             />
@@ -138,7 +140,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
               name="telefono"
               value={formData.telefono}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Ej: 3213213213"
             />
           </div>
@@ -153,7 +155,7 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
               name="direccion"
               value={formData.direccion}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Dirección"
             />
           </div>
@@ -165,14 +167,13 @@ const ClientModal = ({ cliente, isCreating, onClose, onSave }) => {
             </label>
             <input
               type="email"
-              name="email"  // ✅ Aquí también
+              name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="correo@ejemplo.com"
             />
           </div>
-
 
           {/* Error message */}
           {error && (
