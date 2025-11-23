@@ -4,9 +4,11 @@ import {
   FaEnvelope,
   FaEdit,
   FaChevronDown,
+  FaTrash,
+  FaTimes,
 } from "react-icons/fa";
 
-const ClientCard = ({ cliente, onEdit, onSelect, isOpen }) => {
+const ClientCard = ({ cliente, onEdit, onSelect, onArchive, isOpen, mostrarArchivados }) => {
   return (
     <div
       className="w-full bg-white shadow-md rounded-xl p-4 mb-4 border border-gray-200 hover:shadow-lg transition cursor-pointer"
@@ -21,16 +23,12 @@ const ClientCard = ({ cliente, onEdit, onSelect, isOpen }) => {
 
           <div className="flex flex-col md:flex-row md:items-center text-gray-700 mt-2 text-sm gap-2">
             <p className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-6 h-6 border border-black rounded-full">
-                <FaPhone className="text-black text-xs" />
-              </span>
+              <FaPhone className="text-black text-xs" />
               {cliente?.telefono || "Teléfono no registrado"}
             </p>
 
             <p className="flex items-center gap-2 md:ml-6">
-              <span className="flex items-center justify-center w-6 h-6 border border-black rounded-full">
-                <FaEnvelope className="text-black text-xs" />
-              </span>
+              <FaEnvelope className="text-black text-xs" />
               {cliente?.email || "Correo no registrado"}
             </p>
           </div>
@@ -48,6 +46,30 @@ const ClientCard = ({ cliente, onEdit, onSelect, isOpen }) => {
           >
             <FaEdit size={18} />
           </button>
+
+          {!mostrarArchivados ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive(cliente);
+              }}
+              className="text-red-500 hover:text-red-700 transition"
+              title="Archivar cliente"
+            >
+              <FaTrash size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive(cliente);
+              }}
+              className="text-green-600 hover:text-green-800 transition"
+              title="Restaurar cliente"
+            >
+              <FaTimes size={18} />
+            </button>
+          )}
 
           <button
             onClick={(e) => {

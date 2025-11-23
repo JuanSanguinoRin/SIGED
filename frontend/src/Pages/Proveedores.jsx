@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import { apiUrl } from "../config/api";
 import {
   FaPhone,
   FaEnvelope,
   FaMapMarkerAlt,
   FaEdit,
+  FaTrash,
   FaChevronDown,
   FaTimes,
   FaPlus,
@@ -17,11 +19,10 @@ const Proveedores = () => {
   const [selectedProveedor, setSelectedProveedor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [mostrarArchivados] = useState(false);
   const [modalProveedor, setModalProveedor] = useState(null);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [modalCrear, setModalCrear] = useState(false);
 
-  // 🔹 Cargar proveedores (según si se muestran archivados o no)
   useEffect(() => {
     fetchProveedores();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -31,7 +32,7 @@ const Proveedores = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/terceros/proveedores/?archivado=${mostrarArchivados}`
+        apiUrl(`terceros/proveedores/?archivado=${mostrarArchivados}`)
       );
       if (!response.ok) throw new Error("Error al obtener proveedores");
       const data = await response.json();
@@ -43,14 +44,13 @@ const Proveedores = () => {
     }
   };
 
-  // 🔹 Buscar por nombre (nota: el backend filtra por archivado en buscar_por_nombre)
   const handleBuscar = async (termino) => {
     if (!termino) {
       fetchProveedores();
       return;
     }
     try {
-      const url = `http://127.0.0.1:8000/api/terceros/proveedores/buscar_por_nombre/?nombre=${termino}`;
+      const url = apiUrl(`terceros/proveedores/buscar_por_nombre/?nombre=${termino}`);
       const response = await fetch(url);
       if (response.status === 404) {
         setProveedores([]);
@@ -58,7 +58,6 @@ const Proveedores = () => {
       }
       if (!response.ok) throw new Error("Error al buscar proveedores");
       const data = await response.json();
-      // Nota: buscar_por_nombre en backend devuelve sólo no archivados por defecto.
       setProveedores(Array.isArray(data) ? data : [data]);
     } catch (err) {
       setError(err.message);
@@ -66,54 +65,45 @@ const Proveedores = () => {
   };
 
   useEffect(() => {
-    const delayDebounce = setTimeout(() => handleBuscar(searchTerm), 400);
-    return () => clearTimeout(delayDebounce);
+    const delay = setTimeout(() => handleBuscar(searchTerm), 400);
+    return () => clearTimeout(delay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // 🔹 Obtener detalle del proveedor + historial de compras
-const handleSelect = async (proveedor) => {
-  // Si ya está seleccionado, lo deselecciona (colapsa la vista)
-  if (selectedProveedor?.id === proveedor.id) {
-    setSelectedProveedor(null);
-    return;
-  }
+  const handleSelect = async (proveedor) => {
+    if (selectedProveedor?.id === proveedor.id) {
+      setSelectedProveedor(null);
+      return;
+    }
+    try {
+      const [detalleRes, comprasRes] = await Promise.all([
+        fetch(apiUrl(`terceros/proveedores/${proveedor.id}/`)),
+        fetch(apiUrl(`compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedor.id}`))
+      ]);
 
-  try {
-    // Cargar detalle del proveedor y su historial en paralelo
-    const [detalleRes, comprasRes] = await Promise.all([
-      fetch(`http://127.0.0.1:8000/api/terceros/proveedores/${proveedor.id}/`),
-      fetch(`http://127.0.0.1:8000/api/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedor.id}`)
-    ]);
+      if (!detalleRes.ok) throw new Error("Error al obtener detalle del proveedor");
+      if (!comprasRes.ok) throw new Error("Error al obtener historial de compras");
 
-    // Validar respuestas HTTP
-    if (!detalleRes.ok) throw new Error("Error al obtener detalle del proveedor");
-    if (!comprasRes.ok) throw new Error("Error al obtener historial de compras");
+      const detalle = await detalleRes.json();
+      const comprasProveedor = await comprasRes.json();
 
-    // Convertir ambas respuestas a JSON
-    const detalle = await detalleRes.json();
-    const comprasProveedor = await comprasRes.json();
-
-    // Actualizar el estado con ambos resultados
-    setSelectedProveedor({
-      ...detalle,
-      historial: comprasProveedor,
-    });
-  } catch (err) {
-    console.error("❌ Error cargando detalle/historial:", err);
-    alert("Error cargando detalle o historial del proveedor.");
-  }
-};
+      setSelectedProveedor({
+        ...detalle,
+        historial: comprasProveedor,
+      });
+    } catch (err) {
+      console.error("❌ Error cargando detalle/historial:", err);
+      alert("Error cargando detalle o historial del proveedor.");
+    }
+  };
 
   const handleEdit = (proveedor) => setModalProveedor(proveedor);
 
-  // 🔹 Archivar / Restaurar (usa endpoints diferentes)
   const handleArchive = async (proveedor) => {
     try {
-      // Construir URL según si está archivando o desarchivando
-      const endpoint = `http://127.0.0.1:8000/api/terceros/proveedores/${proveedor.id}/${
+      const endpoint = apiUrl(`terceros/proveedores/${proveedor.id}/${
         mostrarArchivados ? 'desarchivar' : 'archivar'
-      }/`;
+      }/`);
 
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -134,10 +124,8 @@ const handleSelect = async (proveedor) => {
 
       const data = await response.json();
       
-      // Refresca la lista
       await fetchProveedores();
       
-      // Cerrar detalle si estaba abierto
       if (selectedProveedor?.id === proveedor.id) {
         setSelectedProveedor(null);
       }
@@ -159,10 +147,9 @@ const handleSelect = async (proveedor) => {
     );
   };
 
-  // 🔹 Crear proveedor (abre modal). submit en modal hace POST
   const handleCreate = async (formData) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/terceros/proveedores/`, {
+      const response = await fetch(apiUrl("terceros/proveedores/"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -174,7 +161,6 @@ const handleSelect = async (proveedor) => {
       }
       const created = await response.json();
       setModalCrear(false);
-      // Si estamos viendo archivados, no recargamos (porque el nuevo es activo). Si estamos en activos, recargamos.
       if (!mostrarArchivados) {
         await fetchProveedores();
       }
@@ -190,7 +176,6 @@ const handleSelect = async (proveedor) => {
 
   return (
     <div className="p-6 max-w-5xl mx-auto relative">
-      {/* Botones de crear y archivados */}
       <div className="absolute right-4 top-6 flex gap-3">
         <button
           onClick={() => setModalCrear(true)}
@@ -200,22 +185,27 @@ const handleSelect = async (proveedor) => {
           <FaPlus /> Crear
         </button>
 
+        <button
+          onClick={() => setMostrarArchivados((s) => !s)}
+          className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition"
+          title={mostrarArchivados ? "Ver proveedores activos" : "Ver proveedores archivados"}
+        >
+          {mostrarArchivados ? "Ver activos" : "Archivados"}
+        </button>
       </div>
 
       <h2 className="text-3xl font-bold mb-6 text-gray-800">Proveedores</h2>
 
-      {/* Barra de búsqueda */}
       <div className="relative mb-6 w-full max-w-lg mx-auto">
         <input
           type="text"
-          placeholder="Buscar proveedor..."
+          placeholder={mostrarArchivados ? "Buscar proveedores archivados..." : "Buscar proveedor..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-4 pr-4 py-3 rounded-2xl bg-gray-200 shadow text-gray-900 placeholder-gray-500 outline-none border-none transition focus:bg-gray-300"
         />
       </div>
 
-      {/* Lista */}
       {proveedores.length === 0 ? (
         <p className="text-center text-gray-500">
           {mostrarArchivados ? "No hay proveedores archivados." : "No se encontraron proveedores."}
@@ -255,7 +245,29 @@ const handleSelect = async (proveedor) => {
                     <FaEdit size={18} />
                   </button>
 
-                 
+                  {!mostrarArchivados ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArchive(proveedor);
+                      }}
+                      className="text-red-500 hover:text-red-700 transition"
+                      title="Archivar proveedor"
+                    >
+                      <FaTrash size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArchive(proveedor);
+                      }}
+                      className="text-green-600 hover:text-green-800 transition"
+                      title="Restaurar proveedor"
+                    >
+                      <FaTimes size={18} />
+                    </button>
+                  )}
 
                   <button
                     onClick={(e) => {
@@ -274,7 +286,6 @@ const handleSelect = async (proveedor) => {
                 </div>
               </div>
 
-              {/* Detalle con historial dinámico */}
               {selectedProveedor?.id === proveedor.id && (
                 <div className="p-4 bg-white border-t border-gray-200 mt-3 transition-all duration-500 ease-in-out">
                   <h3 className="text-2xl font-semibold text-gray-800 mb-4">
@@ -311,7 +322,7 @@ const handleSelect = async (proveedor) => {
                     selectedProveedor.historial.map((compra) => (
                       <div key={compra.id} className="mb-5">
                         <p className="font-semibold text-gray-700">
-                          {compra.descripcion} — {compra.fecha}
+                          {compra.descripcion} – {compra.fecha}
                         </p>
                         <table className="w-full border-collapse text-sm mt-2 mb-3">
                           <thead>
@@ -381,7 +392,7 @@ const EditProveedorModal = ({ proveedor, onClose, onSave }) => {
     e.preventDefault();
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/terceros/proveedores/${proveedor.id}/`,
+        apiUrl(`terceros/proveedores/${proveedor.id}/`),
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -402,7 +413,6 @@ const EditProveedorModal = ({ proveedor, onClose, onSave }) => {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-lg">
-        {/* Encabezado */}
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-gray-800">Editar Proveedor</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition">
@@ -410,7 +420,6 @@ const EditProveedorModal = ({ proveedor, onClose, onSave }) => {
           </button>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-600">Nombre</label>
@@ -456,7 +465,6 @@ const EditProveedorModal = ({ proveedor, onClose, onSave }) => {
             />
           </div>
 
-          {/* Botones */}
           <div className="flex justify-end gap-3 mt-6">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-700">
               Cancelar
@@ -471,7 +479,7 @@ const EditProveedorModal = ({ proveedor, onClose, onSave }) => {
   );
 };
 
-// 🟣 Modal de creación (efecto desenfoque en backdrop)
+// 🟣 Modal de creación
 const CreateProveedorModal = ({ onClose, onCreate }) => {
   const [formData, setFormData] = useState({
     nombre: "",

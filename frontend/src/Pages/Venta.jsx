@@ -3,7 +3,7 @@ import axios from "axios";
 import { FaMoneyBillWave } from "react-icons/fa";
 import { apiUrl } from "../config/api";
 
-const BASE_URL = "http://127.0.0.1:8000/api/";
+//const BASE_URL = "http://127.0.0.1:8000/api/";
 
 const VentaForm = () => {
   const [clientes, setClientes] = useState([]);
