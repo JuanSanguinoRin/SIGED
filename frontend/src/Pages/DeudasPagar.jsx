@@ -1,16 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-
-const API_BASE = "http://127.0.0.1:8000";
+import { apiUrl } from "../config/api";
 
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
 }
 
 const calcularValorCuotaRecomendado = (montoPendiente, cuotasRestantes) => {
-    if (!montoPendiente || !cuotasRestantes) return null;
-    return parseFloat(montoPendiente / cuotasRestantes).toFixed(2);
-  };
+  if (!montoPendiente || !cuotasRestantes) return null;
+  return parseFloat(montoPendiente / cuotasRestantes).toFixed(2);
+};
 
 // Componente para el badge de estado
 const EstadoBadge = ({ estado }) => {
@@ -42,7 +41,7 @@ const DeudasPagar = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [openProveedorId, setOpenProveedorId] = useState(null);
   const [openDeudaId, setOpenDeudaId] = useState(null);
-  
+
   // Estado para el filtro activo
   const [filtroEstado, setFiltroEstado] = useState("En Proceso");
 
@@ -50,7 +49,7 @@ const DeudasPagar = () => {
     if (!estado) return "";
     if (typeof estado === "string") return estado;
     if (typeof estado === "object") return estado.nombre || "";
-    
+
     // Si es un número (ID), convertirlo al nombre
     if (typeof estado === "number") {
       const estadosMap = {
@@ -61,13 +60,13 @@ const DeudasPagar = () => {
       };
       return estadosMap[estado] || "";
     }
-    
+
     return "";
   };
 
   const fetchMetodosPago = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/dominios_comunes/metodos-pago/`);
+      const res = await fetch(apiUrl("/dominios_comunes/metodos-pago/"));
       if (!res.ok) throw new Error("Error al obtener métodos de pago");
       const data = await res.json();
       setMetodosPago(data);
@@ -76,34 +75,34 @@ const DeudasPagar = () => {
     }
   };
 
-const fetchAllProveedoresAndFilter = async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    // ✅ UNA SOLA CONSULTA
-    const res = await fetch(`${API_BASE}/api/apartado_credito/deudas-por-pagar-optimizado/`);
-    if (!res.ok) throw new Error("Error al obtener deudas");
-    const data = await res.json();
+  const fetchAllProveedoresAndFilter = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // ✅ UNA SOLA CONSULTA
+      const res = await fetch(apiUrl("/apartado_credito/deudas-por-pagar-optimizado/"));
+      if (!res.ok) throw new Error("Error al obtener deudas");
+      const data = await res.json();
 
-    // Filtrar por estado
-    const filtrado = data
-      .map((item) => {
-        const deudasFiltradas = item.deudas.filter((d) => {
-          const estadoNombre = getEstadoNombre(d.estado);
-          return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
-        });
-        return { proveedor: item.proveedor, deudas: deudasFiltradas };
-      })
-      .filter((it) => it.deudas.length > 0);
+      // Filtrar por estado
+      const filtrado = data
+        .map((item) => {
+          const deudasFiltradas = item.deudas.filter((d) => {
+            const estadoNombre = getEstadoNombre(d.estado);
+            return estadoNombre.toLowerCase() === filtroEstado.toLowerCase();
+          });
+          return { proveedor: item.proveedor, deudas: deudasFiltradas };
+        })
+        .filter((it) => it.deudas.length > 0);
 
-    setProveedoresConDeuda(filtrado);
-  } catch (err) {
-    console.error(err);
-    setError(err.message || String(err));
-  } finally {
-    setLoading(false);
-  }
-};
+      setProveedoresConDeuda(filtrado);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleBuscar = async (termino) => {
     if (!termino) {
@@ -113,7 +112,7 @@ const fetchAllProveedoresAndFilter = async () => {
 
     try {
       // Buscar proveedores por nombre
-      const url = `${API_BASE}/api/terceros/proveedores/buscar_por_nombre/?nombre=${termino}`;
+      const url = apiUrl(`/terceros/proveedores/buscar_por_nombre/?nombre=${termino}`);
 
       const response = await fetch(url);
       if (response.status === 404) {
@@ -148,12 +147,11 @@ const fetchAllProveedoresAndFilter = async () => {
     }
   };
 
-
   //ESTE METODO DA MUCHOS PROBLEMAS DE RENDIMIENTO, DEBO REEMPLAZARLO CUANDO CLAUDE ME DE NUEVOS TOKENS PIPIPI
   const obtenerDeudasPorProveedor = async (proveedorId) => {
     try {
       const comprasRes = await fetch(
-        `${API_BASE}/api/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedorId}`
+        apiUrl(`/compra_venta/compras/por-proveedor-id/?proveedor_id=${proveedorId}`)
       );
       if (!comprasRes.ok) return [];
       const compras = await comprasRes.json();
@@ -164,14 +162,14 @@ const fetchAllProveedoresAndFilter = async () => {
             const creditoId = typeof c.credito === "object" ? c.credito.id : c.credito;
             try {
               const det = await fetch(
-                `${API_BASE}/api/apartado_credito/creditos/${creditoId}/`
+                apiUrl(`/apartado_credito/creditos/${creditoId}/`)
               );
               if (!det.ok) throw new Error("no detalle credito");
-              const crédito = await det.json();
+              const credito = await det.json();
 
               // Obtener cuotas/abonos del crédito
               const cuotasRes = await fetch(
-                `${API_BASE}/api/apartado_credito/cuotas/?credito=${creditoId}`
+                apiUrl(`/apartado_credito/cuotas/?credito=${creditoId}`)
               );
               const cuotas = cuotasRes.ok ? await cuotasRes.json() : [];
 
@@ -180,17 +178,17 @@ const fetchAllProveedoresAndFilter = async () => {
                 compra: c,
                 tipo: "Crédito",
                 total: c.total,
-                cuotas_pendientes: crédito.cuotas_pendientes,
-                fecha_limite: crédito.fecha_limite,
+                cuotas_pendientes: credito.cuotas_pendientes,
+                fecha_limite: credito.fecha_limite,
                 estado:
-                  getEstadoNombre(crédito.estado_detalle) ||
-                  getEstadoNombre(crédito.estado) ||
-                  getEstadoNombre(crédito.estado_nombre),
-                credito_id: crédito.id,
-                monto_pendiente: crédito.monto_pendiente ?? null,
-                cantidad_cuotas: crédito.cantidad_cuotas,
-                interes: crédito.interes,
-                descripcion: crédito.descripcion,
+                  getEstadoNombre(credito.estado_detalle) ||
+                  getEstadoNombre(credito.estado) ||
+                  getEstadoNombre(credito.estado_nombre),
+                credito_id: credito.id,
+                monto_pendiente: credito.monto_pendiente ?? null,
+                cantidad_cuotas: credito.cantidad_cuotas,
+                interes: credito.interes,
+                descripcion: credito.descripcion,
                 abonos: cuotas,
               };
             } catch (e) {
@@ -253,7 +251,7 @@ const fetchAllProveedoresAndFilter = async () => {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/api/apartado_credito/cuotas/`, {
+      const res = await fetch(apiUrl("/apartado_credito/cuotas/"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -270,13 +268,13 @@ const fetchAllProveedoresAndFilter = async () => {
       // Obtener el detalle actualizado
       let detalleActualizado = null;
       const det = await fetch(
-        `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/`
+        apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/`)
       );
       detalleActualizado = det.ok ? await det.json() : null;
 
       // Obtener cuotas actualizadas
       const cuotasRes = await fetch(
-        `${API_BASE}/api/apartado_credito/cuotas/?credito=${deuda.credito_id}`
+        apiUrl(`/apartado_credito/cuotas/?credito=${deuda.credito_id}`)
       );
       const cuotasActualizadas = cuotasRes.ok ? await cuotasRes.json() : [];
 
@@ -343,7 +341,7 @@ const fetchAllProveedoresAndFilter = async () => {
     }
 
     try {
-      const url = `${API_BASE}/api/apartado_credito/creditos/${deuda.credito_id}/cancelar/`;
+      const url = apiUrl(`/apartado_credito/creditos/${deuda.credito_id}/cancelar/`);
 
       const res = await fetch(url, {
         method: "POST",
@@ -357,17 +355,17 @@ const fetchAllProveedoresAndFilter = async () => {
       }
 
       const data = await res.json();
-      
+
       // Actualizar la lista local eliminando la deuda cancelada
       setProveedoresConDeuda((prev) =>
         prev
           .map((item) => {
             if (item.proveedor.id !== proveedor.id) return item;
-            
+
             const deudasActualizadas = item.deudas.filter(
               (d) => !(d.compra_id === deuda.compra_id && d.tipo === deuda.tipo)
             );
-            
+
             return { ...item, deudas: deudasActualizadas };
           })
           .filter((item) => item.deudas.length > 0)
