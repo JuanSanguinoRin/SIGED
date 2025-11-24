@@ -116,6 +116,8 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
                 compra.credito.cuotas_pendientes = compra.credito.cantidad_cuotas
             compra.credito.save()
 
+        
+
         return compra
     
     @transaction.atomic
@@ -210,6 +212,7 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         prendas_data = validated_data.pop('prendas', [])
 
+        # ✅ Crear venta SIN disparar el signal aún
         venta = Venta.objects.create(**validated_data)
 
         # Crear prendas (YA actualizan stock dentro de save)
@@ -218,7 +221,11 @@ class VentaCreateUpdateSerializer(serializers.ModelSerializer):
 
         # Calcular total una sola vez
         venta.total = venta.calcular_total()
-        venta.save(update_fields=['total'])
+        venta.save(update_fields=['total'])  # ✅ AQUÍ se dispara el signal CON el total correcto
+
+        # ✅ DISPARAR SIGNAL MANUALMENTE AHORA QUE EL TOTAL ESTÁ LISTO
+        from caja.signals import registrar_venta_en_caja
+        registrar_venta_en_caja(Venta, venta, created=True)
 
         return venta
 
