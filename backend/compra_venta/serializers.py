@@ -22,6 +22,7 @@ class CompraPrendaSerializer(serializers.ModelSerializer):
         model = CompraPrenda
         fields = [
             'id', 'prenda', 'prenda_nombre', 'prenda_gramos', 
+          
             'cantidad', 'precio_por_gramo', 'subtotal_gramos', 'subtotal'
         ]
         read_only_fields = ['subtotal', 'subtotal_gramos']
@@ -43,6 +44,7 @@ class VentaPrendaSerializer(serializers.ModelSerializer):
         model = VentaPrenda
         fields = [
             'id', 'prenda', 'prenda_nombre', 'prenda_gramos', 
+            
             'cantidad', 'precio_por_gramo', 'gramo_ganancia', 'subtotal_gramos', 'subtotal'
         ]
         read_only_fields = ['subtotal', 'subtotal_gramos']
