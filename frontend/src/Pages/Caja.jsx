@@ -436,7 +436,7 @@ const TablaMovimientos = ({ titulo, color, datos, columnas, renderFila }) => {
 };
 
 // =============================================
-// COMPONENTE: MODAL DE DETALLES (MEJORADO)
+// COMPONENTE: MODAL DE DETALLES (COMPLETO Y CORREGIDO)
 // =============================================
 const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
   const [detalles, setDetalles] = useState(null);
@@ -461,6 +461,18 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
       if (url) {
         const res = await fetch(url);
         const data = await res.json();
+        
+        // ✅ CORRECCIÓN: Cargar tipos de oro ANTES de actualizar el estado
+        if (data.prendas && data.prendas.length > 0) {
+          const prendasConTipo = await Promise.all(
+            data.prendas.map(async (prenda) => {
+              const tipo_oro = await obtenerTipoOro(prenda.prenda);
+              return { ...prenda, tipo_oro };
+            })
+          );
+          data.prendas = prendasConTipo;
+        }
+        
         setDetalles(data);
       }
     } catch (err) {
@@ -477,41 +489,41 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
     })}`;
   };
 
-  // ✅ Función de impresión mejorada
-  const handleImprimir = () => {
-    const contenidoModal = document.getElementById('modal-recibo-contenido');
-    if (!contenidoModal) return;
+ 
 
-    const ventanaImpresion = window.open('', '_blank');
-    ventanaImpresion.document.write(`
-      <html>
-        <head>
-          <title>Recibo - Movimiento #${movimiento.venta_info?.id || movimiento.compra_info?.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f3f4f6; font-weight: bold; }
-            .total { font-size: 24px; font-weight: bold; color: #1e40af; }
-            @media print {
-              button { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${contenidoModal.innerHTML}
-        </body>
-      </html>
-    `);
-    ventanaImpresion.document.close();
-    ventanaImpresion.print();
+  // ✅ Función para obtener tipo de oro desde los datos de inventario
+  const obtenerTipoOro = async (prendaId) => {
+    try {
+      const res = await fetch(apiUrl(`/prendas/prendas/${prendaId}/`));
+      const prenda = await res.json();
+      return prenda.tipo_oro_nombre || "—";
+    } catch (err) {
+      console.error("Error obteniendo tipo de oro:", err);
+      return "—";
+    }
   };
+
+  // ✅ Cargar tipo de oro para cada prenda
+  useEffect(() => {
+    if (detalles?.prendas) {
+      const cargarTiposOro = async () => {
+        const prendasConTipo = await Promise.all(
+          detalles.prendas.map(async (prenda) => {
+            const tipo_oro = await obtenerTipoOro(prenda.prenda);
+            return { ...prenda, tipo_oro };
+          })
+        );
+        setDetalles((prev) => ({ ...prev, prendas: prendasConTipo }));
+      };
+      cargarTiposOro();
+    }
+  }, [detalles?.id]); // Solo ejecutar cuando cambie el ID de detalles
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header del Modal */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center z-10">
           <div>
             <h3 className="text-2xl font-bold">📄 Recibo de Movimiento</h3>
             <p className="text-sm opacity-90">
@@ -528,8 +540,8 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
           </button>
         </div>
 
-        {/* Contenido del Modal */}
-        <div className="p-6">
+        {/* ✅ Contenido imprimible */}
+        <div id="modal-recibo-contenido" className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -579,7 +591,7 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
                 )}
               </div>
 
-              {/* ✅ Tabla de Prendas - CORREGIR EL MATERIAL */}
+              {/* ✅ Tabla de Prendas CON Material + Chatarra + Recuperable */}
               {detalles?.prendas && detalles.prendas.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -588,73 +600,101 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
                   </h4>
                   
                   <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Prenda
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Material
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Gramos
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Precio/g
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Cant.
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Subtotal
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {detalles.prendas.map((prenda, idx) => (
-                          <tr key={idx} className="bg-white hover:bg-blue-50/30 transition">
-                            <td className="px-4 py-3">
-                              <span className="font-medium text-gray-800">
-                                {prenda.prenda_nombre}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {/* ✅ CORREGIDO: Usar tipo_oro en lugar de tipo_prenda */}
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
-                                ${prenda.tipo_oro === "ITALIANO" 
-                                  ? "bg-yellow-100 text-yellow-800" 
-                                  : prenda.tipo_oro === "NACIONAL"
-                                  ? "bg-gray-100 text-gray-800"
-                                  : "bg-blue-100 text-blue-800"
-                                }`}>
-                                {prenda.tipo_oro || "—"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="font-mono text-gray-700">
-                                {parseFloat(prenda.prenda_gramos || 0).toFixed(2)}g
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="font-mono text-gray-700">
-                                {formatearMonto(prenda.precio_por_gramo)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-semibold text-sm">
-                                {prenda.cantidad}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="font-bold text-gray-900">
-                                {formatearMonto(prenda.subtotal)}
-                              </span>
-                            </td>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                          <tr>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Prenda
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Material
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Gramos
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Precio/g
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Cant.
+                            </th>
+                            <th className="px-2 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Chat.
+                            </th>
+                            <th className="px-2 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Rec.
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Subtotal
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {detalles.prendas.map((prenda, idx) => (
+                            <tr key={idx} className="bg-white hover:bg-blue-50/30 transition">
+                              <td className="px-3 py-3">
+                                <span className="font-medium text-gray-800">
+                                  {prenda.prenda_nombre}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                {/* ✅ Mostrar tipo_oro cargado dinámicamente */}
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                                  ${prenda.tipo_oro === "ITALIANO" 
+                                    ? "bg-yellow-100 text-yellow-800" 
+                                    : prenda.tipo_oro === "NACIONAL"
+                                    ? "bg-gray-100 text-gray-800"
+                                    : "bg-blue-100 text-blue-800"
+                                  }`}>
+                                  {prenda.tipo_oro || "..."}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className="font-mono text-gray-700">
+                                  {parseFloat(prenda.prenda_gramos || 0).toFixed(2)}g
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <span className="font-mono text-gray-700">
+                                  {formatearMonto(prenda.precio_por_gramo)}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-semibold text-sm">
+                                  {prenda.cantidad}
+                                </span>
+                              </td>
+                              {/* ✅ Columna Chatarra */}
+                              <td className="px-2 py-3 text-center">
+                                {prenda.es_chatarra ? (
+                                  <svg className="w-5 h-5 mx-auto text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                                  </svg>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              {/* ✅ Columna Recuperable */}
+                              <td className="px-2 py-3 text-center">
+                                {prenda.es_recuperable ? (
+                                  <svg className="w-5 h-5 mx-auto text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                                  </svg>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <span className="font-bold text-gray-900">
+                                  {formatearMonto(prenda.subtotal)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -724,7 +764,7 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
          {/* Footer del Modal */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200 flex justify-end gap-3">
           <button
-            onClick={handleImprimir} // ✅ USAR LA FUNCIÓN PERSONALIZADA
+            onClick={() => window.print()}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
