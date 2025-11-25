@@ -77,6 +77,7 @@ class CompraSerializer(serializers.ModelSerializer):
 
 
 
+# compra_venta/serializers.py
 class CompraCreateUpdateSerializer(serializers.ModelSerializer):
     prendas = CompraPrendaSerializer(many=True, required=True)
 
@@ -97,9 +98,10 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         prendas_data = validated_data.pop('prendas', [])
 
+        # ✅ Crear compra (signal aún no se dispara porque total = 0)
         compra = Compra.objects.create(**validated_data)
 
-        # Crear prendas (YA actualizan stock dentro de save)
+        # Crear prendas (actualizan stock)
         for p_data in prendas_data:
             CompraPrenda.objects.create(compra=compra, **p_data)
 
@@ -107,16 +109,17 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
         compra.total = compra.calcular_total()
         compra.save(update_fields=['total'])
 
-        # ✅ AGREGAR ESTO: Si la compra tiene crédito, inicializar montos
+        # Si tiene crédito, inicializar montos
         if compra.credito:
             compra.credito.monto_total = compra.total
             compra.credito.monto_pendiente = compra.total
-            # Asegurar cuotas_pendientes inicial si no se ha definido
             if compra.credito.cuotas_pendientes is None:
                 compra.credito.cuotas_pendientes = compra.credito.cantidad_cuotas
             compra.credito.save()
 
-        
+        # ✅ DISPARAR SIGNAL MANUALMENTE AHORA QUE EL TOTAL ESTÁ LISTO
+        from caja.signals import registrar_compra_en_caja
+        registrar_compra_en_caja(Compra, compra, created=True)
 
         return compra
     
@@ -124,25 +127,22 @@ class CompraCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         prendas_data = validated_data.pop('prendas', None)
 
-        # actualizar campos simples
+        # Actualizar campos simples
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # actualizar prendas si vienen nuevas
+        # Actualizar prendas si vienen nuevas
         if prendas_data is not None:
-            # eliminar prendas anteriores (su delete ya revierte stock)
             instance.prendas.all().delete()
-
-            # crear nuevas
             for p_data in prendas_data:
                 CompraPrenda.objects.create(compra=instance, **p_data)
 
-        # recalcular total
+        # Recalcular total
         instance.total = instance.calcular_total()
         instance.save(update_fields=['total'])
 
-        # ✅ Si es compra a crédito, actualizar el crédito
+        # Si es compra a crédito, actualizar el crédito
         if instance.credito:
             instance.credito.monto_total = instance.total
             instance.credito.monto_pendiente = instance.total

@@ -107,10 +107,14 @@ def registrar_compra_en_caja(sender, instance, created, **kwargs):
     Registra compras en caja automáticamente.
     Solo para compras de contado (sin crédito).
     """
-    if not created:
+    # ✅ Verificar que la compra tenga un total > 0
+    if instance.total <= Decimal('0.00'):
+        print(f"⚠️ [SIGNAL COMPRA] Compra #{instance.id} tiene total 0, esperando...")
         return
     
+    # ✅ EVITAR DUPLICADOS
     if MovimientoCaja.objects.filter(compra=instance).exists():
+        print(f"⚠️ [SIGNAL COMPRA] Compra #{instance.id} ya tiene movimiento registrado")
         return
     
     # Solo compras SIN crédito
@@ -159,20 +163,21 @@ def registrar_cuota_en_caja(sender, instance, created, **kwargs):
     if not created:
         return
     
+    # ✅ EVITAR DUPLICADOS
     if MovimientoCaja.objects.filter(cuota=instance).exists():
+        print(f"⚠️ [SIGNAL CUOTA] Cuota #{instance.id} ya tiene movimiento registrado")
         return
     
     try:
         cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
-        
-        # ✅ CRÍTICO: Convertir explícitamente a Decimal
         monto_cuota = Decimal(str(instance.monto))
         
         # Determinar tipo de cuota
         if instance.credito:
             credito = instance.credito
             
-            if hasattr(credito, 'venta') and credito.venta:
+            # ✅ CORREGIDO: Usar .ventas (plural) y .exists()
+            if credito.ventas.exists():
                 # Crédito de VENTA → Cliente nos paga (ENTRADA)
                 tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
                     nombre='Abono Cliente Crédito',
@@ -182,10 +187,12 @@ def registrar_cuota_en_caja(sender, instance, created, **kwargs):
                     }
                 )
                 
-                cliente = credito.venta.cliente
-                descripcion = f'Abono de cliente {cliente} - Crédito #{credito.id} - Venta #{credito.venta.id}'
+                venta = credito.ventas.first()  # ✅ .ventas (plural)
+                cliente = venta.cliente
+                descripcion = f'Abono de cliente {cliente} - Crédito #{credito.id} - Venta #{venta.id}'
                 
-            elif hasattr(credito, 'compra') and credito.compra:
+            # ✅ CORREGIDO: Usar .compras (plural) y .exists()
+            elif credito.compras.exists():
                 # Crédito de COMPRA → Pagamos a proveedor (SALIDA)
                 tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
                     nombre='Abono Proveedor Crédito',
@@ -195,9 +202,11 @@ def registrar_cuota_en_caja(sender, instance, created, **kwargs):
                     }
                 )
                 
-                proveedor = credito.compra.proveedor
-                descripcion = f'Abono a proveedor {proveedor} - Crédito #{credito.id} - Compra #{credito.compra.id}'
+                compra = credito.compras.first()  # ✅ .compras (plural)
+                proveedor = compra.proveedor
+                descripcion = f'Abono a proveedor {proveedor} - Crédito #{credito.id} - Compra #{compra.id}'
             else:
+                print(f"⚠️ [SIGNAL CUOTA] Crédito #{credito.id} sin venta/compra asociada")
                 return
         
         elif instance.apartado:
@@ -211,28 +220,31 @@ def registrar_cuota_en_caja(sender, instance, created, **kwargs):
             )
             
             apartado = instance.apartado
-            cliente = apartado.venta.cliente
-            descripcion = f'Abono de apartado {cliente} - Apartado #{apartado.id} - Venta #{apartado.venta.id}'
+            # ✅ CORREGIDO: Usar .ventas (plural)
+            venta = apartado.ventas.first()
+            cliente = venta.cliente
+            descripcion = f'Abono de apartado {cliente} - Apartado #{apartado.id} - Venta #{venta.id}'
         
         else:
+            print(f"⚠️ [SIGNAL CUOTA] Cuota #{instance.id} sin crédito ni apartado")
             return
         
         print(f"🔍 [SIGNAL CUOTA] Cuota #{instance.id}")
-        print(f"   - Monto original: {instance.monto} (tipo: {type(instance.monto)})")
-        print(f"   - Monto convertido: {monto_cuota} (tipo: {type(monto_cuota)})")
+        print(f"   - Monto: {monto_cuota}")
+        print(f"   - Tipo: {tipo_movimiento.tipo}")
         print(f"   - Cuenta: {cuenta.nombre}")
         
         # Crear movimiento
         movimiento = MovimientoCaja.objects.create(
             cuenta=cuenta,
             tipo_movimiento=tipo_movimiento,
-            monto=monto_cuota,  # ✅ Usar el Decimal convertido
+            monto=monto_cuota,
             descripcion=descripcion,
             cuota=instance,
             observaciones=f'Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
         )
         
-        print(f"✅ [SIGNAL CUOTA] Movimiento #{movimiento.id} creado - Monto guardado: {movimiento.monto}")
+        print(f"✅ [SIGNAL CUOTA] Movimiento #{movimiento.id} creado exitosamente")
         
     except Exception as e:
         print(f"❌ [SIGNAL CUOTA] Error: {e}")
