@@ -250,6 +250,10 @@ class CuotaViewSet(viewsets.ModelViewSet):
                     apartado.full_clean()
                     apartado.save()
 
+                # ✅ DISPARAR SIGNAL MANUALMENTE DESPUÉS DE ACTUALIZAR TODO
+                from caja.signals import registrar_cuota_en_caja
+                registrar_cuota_en_caja(Cuota, cuota, created=True)
+
         except (DjangoValidationError, DRFValidationError) as e:
             # Errores de validación: devolver mensaje amigable
             return Response({"warning": e.detail if hasattr(e, 'detail') else str(e)}, status=status.HTTP_400_BAD_REQUEST)

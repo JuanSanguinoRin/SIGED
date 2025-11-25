@@ -34,4 +34,7 @@ urlpatterns = [
     path('api/prendas/', include('prendas.urls')),
     path('api/apartado_credito/', include('apartado_credito.urls')),
     path('api/compra_venta/', include('compra_venta.urls')),
+
+
+    path('api/caja/', include('caja.urls')),
 ]
