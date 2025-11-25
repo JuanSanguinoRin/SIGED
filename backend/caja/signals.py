@@ -46,28 +46,28 @@ def obtener_cuenta_por_metodo_pago(metodo_pago):
 def registrar_venta_en_caja(sender, instance, created, **kwargs):
     """
     Registra ventas en caja automáticamente.
-    Solo para ventas de contado (sin crédito ni apartado).
+    - Contado: registra con monto real (afecta caja)
+    - Crédito/Apartado: registra con monto $0 (solo informativo)
     """
     if not created:
         return
     
-    # ✅ NUEVO: Verificar que la venta tenga un total > 0
-    # Esto evita que se registre antes de calcular el total
+    # Verificar que la venta tenga un total > 0
     if instance.total <= Decimal('0.00'):
         print(f"⚠️ [SIGNAL VENTA] Venta #{instance.id} tiene total 0, esperando...")
         return
     
-    # ✅ EVITAR DUPLICADOS (importante para llamadas manuales)
+    # Evitar duplicados
     if MovimientoCaja.objects.filter(venta=instance).exists():
         print(f"⚠️ [SIGNAL VENTA] Venta #{instance.id} ya tiene movimiento registrado")
         return
     
-    if MovimientoCaja.objects.filter(venta=instance).exists():
-        return
-    
-    # Solo ventas SIN crédito y SIN apartado
-    if instance.credito is None and instance.apartado is None:
-        try:
+    try:
+        cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
+        
+        # ✅ DETERMINAR TIPO Y MONTO SEGÚN FORMA DE PAGO
+        if instance.credito is None and instance.apartado is None:
+            # VENTA DE CONTADO → Registrar con monto real
             tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
                 nombre='Venta Contado',
                 defaults={
@@ -75,51 +75,85 @@ def registrar_venta_en_caja(sender, instance, created, **kwargs):
                     'descripcion': 'Ingreso por venta pagada de contado completo'
                 }
             )
+            monto = Decimal(str(instance.total))
+            observaciones = f'Venta de contado. Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
             
-            cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
-            monto_venta = Decimal(str(instance.total))
-            
-            print(f"🔍 [SIGNAL VENTA] Venta #{instance.id}")
-            print(f"   - Total original: {instance.total} (tipo: {type(instance.total)})")
-            print(f"   - Monto convertido: {monto_venta} (tipo: {type(monto_venta)})")
-            print(f"   - Cuenta: {cuenta.nombre}")
-            
-            movimiento = MovimientoCaja.objects.create(
-                cuenta=cuenta,
-                tipo_movimiento=tipo_movimiento,
-                monto=monto_venta,
-                descripcion=f'Venta #{instance.id} - Cliente: {instance.cliente}',
-                venta=instance,
-                observaciones=f'Venta de contado. Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
+        elif instance.credito:
+            # VENTA A CRÉDITO → Registrar con monto $0 (informativo)
+            tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
+                nombre='Venta a Crédito',
+                defaults={
+                    'tipo': TipoMovimiento.ENTRADA,
+                    'descripcion': 'Venta registrada con pago diferido a cuotas'
+                }
             )
+            monto = Decimal('0.00')  # ✅ Monto informativo
+            observaciones = f'Venta a crédito. Total: ${instance.total:,.2f}. Los ingresos se registrarán con cada cuota pagada.'
             
-            print(f"✅ [SIGNAL VENTA] Movimiento #{movimiento.id} creado - Monto guardado: {movimiento.monto}")
-            
-        except Exception as e:
-            print(f"❌ [SIGNAL VENTA] Error: {e}")
-            import traceback
-            traceback.print_exc()
+        elif instance.apartado:
+            # VENTA APARTADO → Registrar con monto $0 (informativo)
+            tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
+                nombre='Venta Apartado',
+                defaults={
+                    'tipo': TipoMovimiento.ENTRADA,
+                    'descripcion': 'Venta con apartado - Cliente pagará en cuotas'
+                }
+            )
+            monto = Decimal('0.00')  # ✅ Monto informativo
+            observaciones = f'Venta con apartado. Total: ${instance.total:,.2f}. Los ingresos se registrarán con cada cuota pagada.'
+        
+        else:
+            return
+        
+        print(f"🔍 [SIGNAL VENTA] Venta #{instance.id}")
+        print(f"   - Total venta: {instance.total}")
+        print(f"   - Monto a registrar: {monto}")
+        print(f"   - Tipo: {tipo_movimiento.nombre}")
+        print(f"   - Cuenta: {cuenta.nombre}")
+        
+        movimiento = MovimientoCaja.objects.create(
+            cuenta=cuenta,
+            tipo_movimiento=tipo_movimiento,
+            monto=monto,
+            descripcion=f'Venta #{instance.id} - Cliente: {instance.cliente}',
+            venta=instance,
+            observaciones=observaciones
+        )
+        
+        print(f"✅ [SIGNAL VENTA] Movimiento #{movimiento.id} creado")
+        
+    except Exception as e:
+        print(f"❌ [SIGNAL VENTA] Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @receiver(post_save, sender=Compra)
 def registrar_compra_en_caja(sender, instance, created, **kwargs):
     """
     Registra compras en caja automáticamente.
-    Solo para compras de contado (sin crédito).
+    - Contado: registra con monto real (afecta caja)
+    - Crédito: registra con monto $0 (solo informativo)
     """
-    # ✅ Verificar que la compra tenga un total > 0
+    if not created:
+        return
+    
+    # Verificar que la compra tenga un total > 0
     if instance.total <= Decimal('0.00'):
         print(f"⚠️ [SIGNAL COMPRA] Compra #{instance.id} tiene total 0, esperando...")
         return
     
-    # ✅ EVITAR DUPLICADOS
+    # Evitar duplicados
     if MovimientoCaja.objects.filter(compra=instance).exists():
         print(f"⚠️ [SIGNAL COMPRA] Compra #{instance.id} ya tiene movimiento registrado")
         return
     
-    # Solo compras SIN crédito
-    if instance.credito is None:
-        try:
+    try:
+        cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
+        
+        # ✅ DETERMINAR TIPO Y MONTO SEGÚN FORMA DE PAGO
+        if instance.credito is None:
+            # COMPRA DE CONTADO → Registrar con monto real
             tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
                 nombre='Compra Contado',
                 defaults={
@@ -127,32 +161,42 @@ def registrar_compra_en_caja(sender, instance, created, **kwargs):
                     'descripcion': 'Egreso por compra pagada de contado completo a proveedor'
                 }
             )
+            monto = Decimal(str(instance.total))
+            observaciones = f'Compra de contado. Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
             
-            cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
-            
-            # ✅ CRÍTICO: Convertir explícitamente a Decimal
-            monto_compra = Decimal(str(instance.total))
-            
-            print(f"🔍 [SIGNAL COMPRA] Compra #{instance.id}")
-            print(f"   - Total original: {instance.total} (tipo: {type(instance.total)})")
-            print(f"   - Monto convertido: {monto_compra} (tipo: {type(monto_compra)})")
-            print(f"   - Cuenta: {cuenta.nombre}")
-            
-            movimiento = MovimientoCaja.objects.create(
-                cuenta=cuenta,
-                tipo_movimiento=tipo_movimiento,
-                monto=monto_compra,  # ✅ Usar el Decimal convertido
-                descripcion=f'Compra #{instance.id} - Proveedor: {instance.proveedor}',
-                compra=instance,
-                observaciones=f'Compra de contado. Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
+        else:
+            # COMPRA A CRÉDITO → Registrar con monto $0 (informativo)
+            tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
+                nombre='Compra a Crédito',
+                defaults={
+                    'tipo': TipoMovimiento.SALIDA,
+                    'descripcion': 'Compra registrada con pago diferido a proveedor'
+                }
             )
-            
-            print(f"✅ [SIGNAL COMPRA] Movimiento #{movimiento.id} creado - Monto guardado: {movimiento.monto}")
-            
-        except Exception as e:
-            print(f"❌ [SIGNAL COMPRA] Error: {e}")
-            import traceback
-            traceback.print_exc()
+            monto = Decimal('0.00')  # ✅ Monto informativo
+            observaciones = f'Compra a crédito. Total: ${instance.total:,.2f}. Los egresos se registrarán con cada cuota pagada.'
+        
+        print(f"🔍 [SIGNAL COMPRA] Compra #{instance.id}")
+        print(f"   - Total compra: {instance.total}")
+        print(f"   - Monto a registrar: {monto}")
+        print(f"   - Tipo: {tipo_movimiento.nombre}")
+        print(f"   - Cuenta: {cuenta.nombre}")
+        
+        movimiento = MovimientoCaja.objects.create(
+            cuenta=cuenta,
+            tipo_movimiento=tipo_movimiento,
+            monto=monto,
+            descripcion=f'Compra #{instance.id} - Proveedor: {instance.proveedor}',
+            compra=instance,
+            observaciones=observaciones
+        )
+        
+        print(f"✅ [SIGNAL COMPRA] Movimiento #{movimiento.id} creado")
+        
+    except Exception as e:
+        print(f"❌ [SIGNAL COMPRA] Error: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @receiver(post_save, sender=Cuota)

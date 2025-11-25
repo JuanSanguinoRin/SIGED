@@ -109,9 +109,9 @@ class MovimientoCaja(models.Model):
     monto = models.DecimalField(
         max_digits=15, 
         decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))]
+        validators=[MinValueValidator(Decimal('0.00'))]
     )
-    descripcion = models.TextField()
+    descripcion = models.TextField()    
     fecha = models.DateTimeField(auto_now_add=True)
     
     # Referencias opcionales para trazabilidad
@@ -162,6 +162,7 @@ class MovimientoCaja(models.Model):
     def save(self, *args, **kwargs):
         """
         Al guardar, actualiza el saldo de la cuenta automáticamente
+        ✅ SOLO si el monto es > 0
         """
         es_nuevo = self.pk is None
         
@@ -171,11 +172,10 @@ class MovimientoCaja(models.Model):
         print(f"   - Cuenta: {self.cuenta.nombre}")
         print(f"   - Saldo actual cuenta ANTES: {self.cuenta.saldo_actual}")
         
-        if es_nuevo:
-            # Convertir a Decimal para asegurar precisión
+        # ✅ SOLO actualizar saldo si el monto es mayor a 0
+        if es_nuevo and self.monto > Decimal('0.00'):
             monto_decimal = Decimal(str(self.monto))
             
-            # Actualizar saldo según tipo de movimiento
             if self.tipo_movimiento.tipo == TipoMovimiento.ENTRADA:
                 self.cuenta.saldo_actual += monto_decimal
                 print(f"   ✅ ENTRADA: Sumando {monto_decimal}")
@@ -185,6 +185,8 @@ class MovimientoCaja(models.Model):
             
             self.cuenta.save()
             print(f"   - Saldo actual cuenta DESPUÉS: {self.cuenta.saldo_actual}")
+        elif es_nuevo:
+            print(f"   ℹ️  Movimiento informativo (monto = 0), no afecta saldo")
         
         super().save(*args, **kwargs)
         print(f"   ✅ Movimiento guardado exitosamente")
