@@ -121,6 +121,8 @@ class MovimientoCajaDetalladoSerializer(serializers.ModelSerializer):
     venta_info = serializers.SerializerMethodField()
     compra_info = serializers.SerializerMethodField()
     cuota_info = serializers.SerializerMethodField()
+    egreso_info = serializers.SerializerMethodField()
+    ingreso_info = serializers.SerializerMethodField()
     
     class Meta:
         model = MovimientoCaja
@@ -135,6 +137,8 @@ class MovimientoCajaDetalladoSerializer(serializers.ModelSerializer):
             'venta_info',
             'compra_info',
             'cuota_info',
+            'egreso_info',  
+            'ingreso_info', 
             'cierre_caja',
             'observaciones'
         ]
@@ -166,6 +170,26 @@ class MovimientoCajaDetalladoSerializer(serializers.ModelSerializer):
                 'id': obj.cuota.id,
                 'monto': str(obj.cuota.monto),
                 'fecha': obj.cuota.fecha
+            }
+        return None
+    
+    def get_egreso_info(self, obj):
+        if obj.egreso:
+            return {
+                'id': obj.egreso.id,
+                'descripcion': obj.egreso.descripcion,
+                'monto': str(obj.egreso.monto),
+                'fecha': obj.egreso.fecha_registro
+            }
+        return None
+    
+    def get_ingreso_info(self, obj):
+        if obj.ingreso:
+            return {
+                'id': obj.ingreso.id,
+                'descripcion': obj.ingreso.descripcion,
+                'monto': str(obj.ingreso.monto),
+                'fecha': obj.ingreso.fecha_registro
             }
         return None
 
