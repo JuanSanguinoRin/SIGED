@@ -13,6 +13,8 @@ import Caja from './Pages/Caja';
 import CompraForm from './Pages/CompraForm';
 import Venta from './Pages/Venta';
 import './App.css';
+import Egresos from './Pages/EgresosForm';
+import Ingresos from './Pages/IngresosForm';
 
 
 
@@ -33,6 +35,8 @@ function App() {
           <Route path="inventario" element={<Inventario />} />
           <Route path="caja" element={<Caja />} />
           <Route path="compras" element={<CompraForm />} />
+          <Route path="egresos" element={<Egresos />} />
+          <Route path="ingresos" element={<Ingresos />} />
           <Route path="ventas" element={<Venta />} />
         </Route>
 

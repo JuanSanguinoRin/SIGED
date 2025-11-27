@@ -182,6 +182,18 @@ export default function Sidebar({
           </NavLink>
 
           <NavLink
+            to="/admin/ingresos"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                ? "bg-purple-600 text-white"
+                : "hover:bg-gray-700"
+              }`
+            }
+          >
+            <FaMoneyBillAlt /> {!collapsed && "Ingresos"}
+          </NavLink>
+
+          <NavLink
             to="/admin/compras"
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
@@ -191,6 +203,18 @@ export default function Sidebar({
             }
           >
             <FaCashRegister /> {!collapsed && "Compras"}
+          </NavLink>
+
+          <NavLink
+            to="/admin/egresos"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                ? "bg-purple-600 text-white"
+                : "hover:bg-gray-700"
+              }`
+            }
+          >
+            <FaMoneyBillAlt /> {!collapsed && "Egresos"}
           </NavLink>
         </nav>
       </aside>
