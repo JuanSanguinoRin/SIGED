@@ -185,7 +185,14 @@ const Caja = () => {
   // =============================================
   const separarMovimientos = (movimientos) => {
     if (!movimientos || movimientos.length === 0) {
-      return { ventas: [], compras: [], cuotasEntrada: [], cuotasSalida: [] };
+      return { 
+        ventas: [], 
+        compras: [], 
+        cuotasEntrada: [], 
+        cuotasSalida: [],
+        ingresosOperativos: [],  // ✅ NUEVO
+        egresosOperativos: []     // ✅ NUEVO
+      };
     }
 
     // ✅ CORRECCIÓN: Manejo unificado para caja actual y cerrada
@@ -223,11 +230,27 @@ const Caja = () => {
                        m.tipo_movimiento?.nombre?.toLowerCase().includes("abono") ||
                        m.tipo_movimiento?.nombre?.toLowerCase().includes("proveedor");
         return tieneCuota && esSalida && esAbono;
+      }), 
+
+       // ✅ NUEVO: Ingresos Operativos
+      ingresosOperativos: movimientos.filter(m => {
+        
+        const esIngresoOp = m.tipo_movimiento_nombre?.toLowerCase().includes("ingreso operativo") ||
+                           m.tipo_movimiento?.nombre?.toLowerCase().includes("ingreso operativo");
+        return  esIngresoOp;
+      }),
+
+      // ✅ NUEVO: Egresos Operativos
+      egresosOperativos: movimientos.filter(m => {
+        
+        const esEgresoOp = m.tipo_movimiento_nombre?.toLowerCase().includes("egreso operativo") ||
+                          m.tipo_movimiento?.nombre?.toLowerCase().includes("egreso operativo");
+        return  esEgresoOp;
       })
     };
   };
 
-  const { ventas, compras, cuotasEntrada, cuotasSalida } = separarMovimientos(datosVista?.movimientos);
+  const { ventas, compras, cuotasEntrada, cuotasSalida, ingresosOperativos, egresosOperativos } = separarMovimientos(datosVista?.movimientos);
 
   // =============================================
   // FORMATEAR NÚMEROS
@@ -668,6 +691,64 @@ const Caja = () => {
                   <td className="px-4 py-3">{proveedorNombre}</td>
                   <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
                   <td className="px-4 py-3 text-right font-semibold">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+
+          {/* ✅ NUEVO: INGRESOS OPERATIVOS */}
+          <TablaMovimientos
+            titulo="INGRESOS OPERATIVOS (Otros Ingresos)"
+            color="bg-teal-500"
+            datos={ingresosOperativos}
+            columnas={["#", "Descripción", "Medio Pago", "Fecha", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const ingresoId = mov.ingreso || mov.ingreso_info?.id || "—";
+              const descripcion = mov.ingreso_info?.descripcion || 
+                                 mov.descripcion.split(" - ")[1] || 
+                                 mov.descripcion;
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-teal-600">#{ingresoId}</td>
+                  <td className="px-4 py-3">{descripcion}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-teal-700">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+
+           {/* ✅ NUEVO: EGRESOS OPERATIVOS */}
+          <TablaMovimientos
+            titulo="EGRESOS OPERATIVOS (Gastos del Negocio)"
+            color="bg-red-600"
+            datos={egresosOperativos}
+            columnas={["#", "Descripción", "Medio Pago", "Fecha", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const egresoId = mov.egreso || mov.egreso_info?.id || "—";
+              const descripcion = mov.egreso_info?.descripcion || 
+                                 mov.descripcion.split(" - ")[1] || 
+                                 mov.descripcion;
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-red-600">#{egresoId}</td>
+                  <td className="px-4 py-3">{descripcion}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-red-700">
                     {formatearMonto(mov.monto)}
                   </td>
                 </>
