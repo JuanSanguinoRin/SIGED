@@ -136,6 +136,21 @@ class MovimientoCaja(models.Model):
         blank=True,
         related_name='movimientos_caja'
     )
+
+    egreso = models.ForeignKey(
+        'egreso_ingreso.Egreso',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movimientos_caja'
+    )
+    ingreso = models.ForeignKey(
+        'egreso_ingreso.Ingreso',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movimientos_caja'
+    )
     
     cierre_caja = models.ForeignKey(
         CierreCaja, 

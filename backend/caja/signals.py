@@ -10,6 +10,7 @@ from .models import (
     TipoMovimiento, 
     CuentaBancaria
 )
+from egreso_ingreso.models import Egreso, Ingreso
 
 
 def obtener_cuenta_por_metodo_pago(metodo_pago):
@@ -292,5 +293,114 @@ def registrar_cuota_en_caja(sender, instance, created, **kwargs):
         
     except Exception as e:
         print(f"❌ [SIGNAL CUOTA] Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+@receiver(post_save, sender=Egreso)
+def registrar_egreso_en_caja(sender, instance, created, **kwargs):
+    """
+    Registra egresos operativos en caja automáticamente.
+    """
+    if not created:
+        return
+    
+    # Verificar que el egreso tenga un monto > 0
+    if instance.monto <= Decimal('0.00'):
+        print(f"⚠️ [SIGNAL EGRESO] Egreso #{instance.id} tiene monto 0")
+        return
+    
+    # Evitar duplicados
+    if MovimientoCaja.objects.filter(
+        descripcion__contains=f'Egreso #{instance.id}'
+    ).exists():
+        print(f"⚠️ [SIGNAL EGRESO] Egreso #{instance.id} ya registrado")
+        return
+    
+    try:
+        cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
+        
+        tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
+            nombre='Egreso Operativo',
+            defaults={
+                'tipo': TipoMovimiento.SALIDA,
+                'descripcion': 'Gastos operativos del negocio'
+            }
+        )
+        
+        monto = Decimal(str(instance.monto))
+        
+        print(f"🔍 [SIGNAL EGRESO] Egreso #{instance.id}")
+        print(f"   - Descripción: {instance.descripcion}")
+        print(f"   - Monto: {monto}")
+        print(f"   - Cuenta: {cuenta.nombre}")
+        
+        movimiento = MovimientoCaja.objects.create(
+            cuenta=cuenta,
+            tipo_movimiento=tipo_movimiento,
+            monto=monto,
+            descripcion=f'Egreso #{instance.id} - {instance.descripcion}',
+            egreso=instance,
+            observaciones=f'Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
+        )
+        
+        print(f"✅ [SIGNAL EGRESO] Movimiento #{movimiento.id} creado")
+        
+    except Exception as e:
+        print(f"❌ [SIGNAL EGRESO] Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@receiver(post_save, sender=Ingreso)
+def registrar_ingreso_en_caja(sender, instance, created, **kwargs):
+    """
+    Registra ingresos operativos en caja automáticamente.
+    """
+    if not created:
+        return
+    
+    # Verificar que el ingreso tenga un monto > 0
+    if instance.monto <= Decimal('0.00'):
+        print(f"⚠️ [SIGNAL INGRESO] Ingreso #{instance.id} tiene monto 0")
+        return
+    
+    # Evitar duplicados
+    if MovimientoCaja.objects.filter(
+        descripcion__contains=f'Ingreso #{instance.id}'
+    ).exists():
+        print(f"⚠️ [SIGNAL INGRESO] Ingreso #{instance.id} ya registrado")
+        return
+    
+    try:
+        cuenta = obtener_cuenta_por_metodo_pago(instance.metodo_pago)
+        
+        tipo_movimiento, _ = TipoMovimiento.objects.get_or_create(
+            nombre='Ingreso Operativo',
+            defaults={
+                'tipo': TipoMovimiento.ENTRADA,
+                'descripcion': 'Ingresos operativos adicionales'
+            }
+        )
+        
+        monto = Decimal(str(instance.monto))
+        
+        print(f"🔍 [SIGNAL INGRESO] Ingreso #{instance.id}")
+        print(f"   - Descripción: {instance.descripcion}")
+        print(f"   - Monto: {monto}")
+        print(f"   - Cuenta: {cuenta.nombre}")
+        
+        movimiento = MovimientoCaja.objects.create(
+            cuenta=cuenta,
+            tipo_movimiento=tipo_movimiento,
+            monto=monto,
+            descripcion=f'Ingreso #{instance.id} - {instance.descripcion}',
+            ingreso=instance,
+            observaciones=f'Método: {instance.metodo_pago.nombre if instance.metodo_pago else "Efectivo"}'
+        )
+        
+        print(f"✅ [SIGNAL INGRESO] Movimiento #{movimiento.id} creado")
+        
+    except Exception as e:
+        print(f"❌ [SIGNAL INGRESO] Error: {e}")
         import traceback
         traceback.print_exc()

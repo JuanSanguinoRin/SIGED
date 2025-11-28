@@ -1,96 +1,256 @@
 "use client";
-import { useState, useEffect } from "react";
-import { FaEye, FaMoneyBillWave, FaCalendarAlt } from "react-icons/fa";
-import { apiUrl } from "../config/api";
+import { useState, useEffect, useRef } from "react";
+import { FaEye, FaMoneyBillWave, FaChevronLeft, FaChevronRight, FaSpinner } from "react-icons/fa";
+
+// ⚠️ IMPORTANTE: Ajusta esta función según tu configuración
+const apiUrl = (path) => `http://127.0.0.1:8000/api${path}`;
 
 const Caja = () => {
+  // =============================================
+  // ESTADOS PRINCIPALES
+  // =============================================
   const [loading, setLoading] = useState(true);
+  const [loadingCambio, setLoadingCambio] = useState(false); // ✅ NUEVO: Loading al cambiar pestaña
   const [error, setError] = useState(null);
 
-  // Estado de los datos
-  const [cuentas, setCuentas] = useState([]);
-  const [movimientos, setMovimientos] = useState([]);
-  const [deudasPorCobrar, setDeudasPorCobrar] = useState([]);
-  const [deudasPorPagar, setDeudasPorPagar] = useState([]);
+  // Estado de pestañas
+  const [cierres, setCierres] = useState([]);
+  const [cajaSeleccionada, setCajaSeleccionada] = useState("actual");
+  
+  // Datos según tipo de caja
+  const [datosActual, setDatosActual] = useState(null);
+  const [datosCierre, setDatosCierre] = useState(null);
 
-  // Fechas de la caja actual
+  // Fechas para cerrar caja
   const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split("T")[0]);
   const [fechaFin, setFechaFin] = useState("");
 
   // Modal de detalles
   const [modalDetalle, setModalDetalle] = useState(null);
 
+  // Referencia para el scroll de pestañas
+  const tabsContainerRef = useRef(null);
+
   // =============================================
-  // CARGAR DATOS INICIALES
+  // CARGAR LISTA DE CIERRES (Al montar)
   // =============================================
   useEffect(() => {
-    cargarDatos();
+    cargarCierres();
+    cargarDatosActual(); // ✅ Cargar caja actual por defecto
   }, []);
 
-  const cargarDatos = async () => {
-    setLoading(true);
-    setError(null);
-
+  const cargarCierres = async () => {
     try {
-      // 1. Cuentas bancarias
-      const resCuentas = await fetch(apiUrl("/caja/cuentas/"));
-      const dataCuentas = await resCuentas.json();
-      setCuentas(dataCuentas);
-
-      // 2. Movimientos de caja (sin cerrar)
-      const resMovimientos = await fetch(apiUrl("/caja/movimientos/?sin_cierre=true"));
-      const dataMovimientos = await resMovimientos.json();
-      setMovimientos(dataMovimientos);
-
-      // 3. Deudas por cobrar (clientes)
-      const resCobrar = await fetch(apiUrl("/apartado_credito/deudas-por-cobrar-optimizado/"));
-      const dataCobrar = await resCobrar.json();
-      setDeudasPorCobrar(dataCobrar);
-
-      // 4. Deudas por pagar (proveedores)
-      const resPagar = await fetch(apiUrl("/apartado_credito/deudas-por-pagar-optimizado/"));
-      const dataPagar = await resPagar.json();
-      setDeudasPorPagar(dataPagar);
-
+      const res = await fetch(apiUrl("/caja/cierres/"));
+      const data = await res.json();
+      // Ordenar del más reciente al más antiguo
+      setCierres(data.sort((a, b) => new Date(b.fecha_cierre) - new Date(a.fecha_cierre)));
     } catch (err) {
-      console.error("Error cargando datos:", err);
-      setError("Error al cargar los datos de caja");
+      console.error("Error cargando cierres:", err);
+    }
+  };
+
+  // =============================================
+  // CARGAR DATOS SEGÚN PESTAÑA SELECCIONADA
+  // =============================================
+  useEffect(() => {
+    if (cajaSeleccionada === "actual") {
+      cargarDatosActual();
+    } else {
+      cargarDatosCierre(cajaSeleccionada);
+    }
+  }, [cajaSeleccionada]);
+
+  // ✅ CARGAR DATOS DE CAJA ACTUAL
+  const cargarDatosActual = async () => {
+    setLoadingCambio(true); // ✅ Activar loading
+    setError(null);
+    
+    try {
+      const [resCuentas, resMovimientos, resCobrar, resPagar] = await Promise.all([
+        fetch(apiUrl("/caja/cuentas/")),
+        fetch(apiUrl("/caja/movimientos/?sin_cierre=true")),
+        fetch(apiUrl("/apartado_credito/deudas-por-cobrar-optimizado/")),
+        fetch(apiUrl("/apartado_credito/deudas-por-pagar-optimizado/"))
+      ]);
+
+      const [cuentas, movimientos, cobrar, pagar] = await Promise.all([
+        resCuentas.json(),
+        resMovimientos.json(),
+        resCobrar.json(),
+        resPagar.json()
+      ]);
+
+      setDatosActual({ cuentas, movimientos, deudasPorCobrar: cobrar, deudasPorPagar: pagar });
+      setDatosCierre(null);
+    } catch (err) {
+      console.error("Error cargando datos actuales:", err);
+      setError("Error al cargar los datos de caja actual");
     } finally {
+      setLoadingCambio(false); // ✅ Desactivar loading
+      setLoading(false);
+    }
+  };
+
+  // ✅ CARGAR DATOS DE CIERRE ESPECÍFICO
+  const cargarDatosCierre = async (cierreId) => {
+    setLoadingCambio(true); // ✅ Activar loading
+    setError(null);
+    
+    try {
+      const res = await fetch(apiUrl(`/caja/cierres/${cierreId}/`));
+      const data = await res.json();
+      setDatosCierre(data);
+      setDatosActual(null);
+    } catch (err) {
+      console.error("Error cargando cierre:", err);
+      setError("Error al cargar los datos del cierre");
+    } finally {
+      setLoadingCambio(false); // ✅ Desactivar loading
       setLoading(false);
     }
   };
 
   // =============================================
-  // CÁLCULOS DE RESUMEN
+  // SCROLL DE PESTAÑAS
   // =============================================
-  const calcularTotalBruto = () => {
-    return cuentas.reduce((sum, c) => sum + parseFloat(c.saldo_actual || 0), 0);
-  };
-
-  const calcularTotalPorCobrar = () => {
-    let total = 0;
-    deudasPorCobrar.forEach(cliente => {
-      cliente.deudas.forEach(deuda => {
-        total += parseFloat(deuda.monto_pendiente || 0);
+  const scrollTabs = (direction) => {
+    if (tabsContainerRef.current) {
+      const scrollAmount = 200;
+      tabsContainerRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
       });
-    });
-    return total;
+    }
   };
 
-  const calcularTotalPorPagar = () => {
-    let total = 0;
-    deudasPorPagar.forEach(proveedor => {
-      proveedor.deudas.forEach(deuda => {
-        total += parseFloat(deuda.monto_pendiente || 0);
+  // =============================================
+  // OBTENER DATOS SEGÚN VISTA (ACTUAL O CIERRE)
+  // =============================================
+  const obtenerDatosVista = () => {
+    if (cajaSeleccionada === "actual" && datosActual) {
+      // ✅ VISTA DE CAJA ACTUAL
+      const totalBruto = datosActual.cuentas.reduce((sum, c) => sum + parseFloat(c.saldo_actual || 0), 0);
+      
+      let totalPorCobrar = 0;
+      datosActual.deudasPorCobrar.forEach(cliente => {
+        cliente.deudas.forEach(deuda => {
+          totalPorCobrar += parseFloat(deuda.monto_pendiente || 0);
+        });
       });
-    });
-    return total;
+
+      let totalPorPagar = 0;
+      datosActual.deudasPorPagar.forEach(proveedor => {
+        proveedor.deudas.forEach(deuda => {
+          totalPorPagar += parseFloat(deuda.monto_pendiente || 0);
+        });
+      });
+
+      const totalNeto = totalBruto + totalPorCobrar - totalPorPagar;
+
+      return {
+        titulo: "Caja Actual",
+        totalBruto,
+        totalNeto,
+        totalPorCobrar,
+        totalPorPagar,
+        cuentas: datosActual.cuentas,
+        movimientos: datosActual.movimientos,
+        esActual: true
+      };
+    } else if (datosCierre) {
+      // ✅ VISTA DE CIERRE
+      return {
+        titulo: `Cierre ${datosCierre.tipo_cierre_display} - ${new Date(datosCierre.fecha_fin).toLocaleDateString('es-CO')}`,
+        totalBruto: parseFloat(datosCierre.saldo_final || 0),
+        totalEntradas: parseFloat(datosCierre.total_entradas || 0),
+        totalSalidas: parseFloat(datosCierre.total_salidas || 0),
+        saldoInicial: parseFloat(datosCierre.saldo_inicial || 0),
+        cuentas: datosCierre.saldos_cuentas || [],
+        movimientos: datosCierre.movimientos || [],
+        esActual: false,
+        fechaInicio: datosCierre.fecha_inicio,
+        fechaFin: datosCierre.fecha_fin,
+        cerradoPor: datosCierre.cerrado_por,
+        observaciones: datosCierre.observaciones
+      };
+    }
+    return null;
   };
 
-  const totalBruto = calcularTotalBruto();
-  const totalPorCobrar = calcularTotalPorCobrar();
-  const totalPorPagar = calcularTotalPorPagar();
-  const totalNeto = totalBruto + totalPorCobrar - totalPorPagar;
+  const datosVista = obtenerDatosVista();
+
+  // =============================================
+  // SEPARAR MOVIMIENTOS POR TIPO
+  // =============================================
+  const separarMovimientos = (movimientos) => {
+    if (!movimientos || movimientos.length === 0) {
+      return { 
+        ventas: [], 
+        compras: [], 
+        cuotasEntrada: [], 
+        cuotasSalida: [],
+        ingresosOperativos: [],  // ✅ NUEVO
+        egresosOperativos: []     // ✅ NUEVO
+      };
+    }
+
+    // ✅ CORRECCIÓN: Manejo unificado para caja actual y cerrada
+    return {
+      ventas: movimientos.filter(m => {
+        // Para caja actual usa venta_info, para cerrada usa venta
+        const tieneVenta = m.venta !== null || m.venta_info !== null;
+        const esVenta = m.tipo_movimiento_nombre?.toLowerCase().includes("venta") ||
+                       m.tipo_movimiento?.nombre?.toLowerCase().includes("venta");
+        return tieneVenta && esVenta;
+      }),
+      
+      compras: movimientos.filter(m => {
+        const tieneCompra = m.compra !== null || m.compra_info !== null;
+        const esCompra = m.tipo_movimiento_nombre?.toLowerCase().includes("compra") ||
+                        m.tipo_movimiento?.nombre?.toLowerCase().includes("compra");
+        return tieneCompra && esCompra;
+      }),
+      
+      cuotasEntrada: movimientos.filter(m => {
+        const tieneCuota = m.cuota !== null || m.cuota_info !== null;
+        const esEntrada = m.tipo_movimiento_tipo === "E" || m.tipo_movimiento?.tipo === "E";
+        const esAbono = m.tipo_movimiento_nombre?.toLowerCase().includes("abono") ||
+                       m.tipo_movimiento_nombre?.toLowerCase().includes("cliente") ||
+                       m.tipo_movimiento?.nombre?.toLowerCase().includes("abono") ||
+                       m.tipo_movimiento?.nombre?.toLowerCase().includes("cliente");
+        return tieneCuota && esEntrada && esAbono;
+      }),
+      
+      cuotasSalida: movimientos.filter(m => {
+        const tieneCuota = m.cuota !== null || m.cuota_info !== null;
+        const esSalida = m.tipo_movimiento_tipo === "S" || m.tipo_movimiento?.tipo === "S";
+        const esAbono = m.tipo_movimiento_nombre?.toLowerCase().includes("abono") ||
+                       m.tipo_movimiento_nombre?.toLowerCase().includes("proveedor") ||
+                       m.tipo_movimiento?.nombre?.toLowerCase().includes("abono") ||
+                       m.tipo_movimiento?.nombre?.toLowerCase().includes("proveedor");
+        return tieneCuota && esSalida && esAbono;
+      }), 
+
+       // ✅ NUEVO: Ingresos Operativos
+      ingresosOperativos: movimientos.filter(m => {
+        
+        const esIngresoOp = m.tipo_movimiento_nombre?.toLowerCase().includes("ingreso operativo") ||
+                           m.tipo_movimiento?.nombre?.toLowerCase().includes("ingreso operativo");
+        return  esIngresoOp;
+      }),
+
+      // ✅ NUEVO: Egresos Operativos
+      egresosOperativos: movimientos.filter(m => {
+        
+        const esEgresoOp = m.tipo_movimiento_nombre?.toLowerCase().includes("egreso operativo") ||
+                          m.tipo_movimiento?.nombre?.toLowerCase().includes("egreso operativo");
+        return  esEgresoOp;
+      })
+    };
+  };
+
+  const { ventas, compras, cuotasEntrada, cuotasSalida, ingresosOperativos, egresosOperativos } = separarMovimientos(datosVista?.movimientos);
 
   // =============================================
   // FORMATEAR NÚMEROS
@@ -105,18 +265,6 @@ const Caja = () => {
   const claseMonto = (monto) => {
     return parseFloat(monto || 0) < 0 ? "text-red-600" : "text-gray-800";
   };
-
-  // =============================================
-  // SEPARAR MOVIMIENTOS POR TIPO
-  // =============================================
-  const ventas = movimientos.filter(m => m.venta_info !== null);
-  const compras = movimientos.filter(m => m.compra_info !== null);
-  const cuotasEntrada = movimientos.filter(m => 
-    m.cuota_info !== null && m.tipo_movimiento.tipo === "E"
-  );
-  const cuotasSalida = movimientos.filter(m => 
-    m.cuota_info !== null && m.tipo_movimiento.tipo === "S"
-  );
 
   // =============================================
   // CERRAR CAJA
@@ -169,12 +317,15 @@ const Caja = () => {
   };
 
   // =============================================
-  // RENDERIZADO
+  // VISTA DE CARGA INICIAL
   // =============================================
-  if (loading) {
+  if (loading && !datosVista) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-gray-600">Cargando datos de caja...</div>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+          <div className="text-xl text-gray-600">Cargando datos...</div>
+        </div>
       </div>
     );
   }
@@ -187,213 +338,432 @@ const Caja = () => {
     );
   }
 
+  // =============================================
+  // RENDERIZADO PRINCIPAL
+  // =============================================
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* ========== HEADER ========== */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">💰 Caja</h1>
-      </div>
-
-      {/* ========== RESUMEN SUPERIOR ========== */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Total Bruto */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg">
-          <p className="text-sm opacity-90">Total Bruto</p>
-          <p className={`text-3xl font-bold ${claseMonto(totalBruto)} text-white`}>
-            {formatearMonto(totalBruto)}
-          </p>
-          <p className="text-xs mt-2 opacity-75">Dinero disponible en cuentas</p>
-        </div>
-
-        {/* Total Neto */}
-        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
-          <p className="text-sm opacity-90">Total Neto</p>
-          <p className={`text-3xl font-bold ${claseMonto(totalNeto)} text-white`}>
-            {formatearMonto(totalNeto)}
-          </p>
-          <p className="text-xs mt-2 opacity-75">Bruto + Por Cobrar - Por Pagar</p>
-        </div>
-
-        {/* Por Cobrar / Pagar */}
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
-          <div className="flex justify-between mb-2">
-            <span className="text-sm opacity-90">Por Cobrar:</span>
-            <span className="font-semibold">{formatearMonto(totalPorCobrar)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-sm opacity-90">Por Pagar:</span>
-            <span className="font-semibold text-red-200">{formatearMonto(totalPorPagar)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ========== FECHAS DE CAJA ========== */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <FaCalendarAlt className="text-blue-500 text-xl" />
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Fecha de Inicio</label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Fecha de Cierre</label>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
+      {/* ========== HEADER CON PESTAÑAS ========== */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-4">💰 Caja</h1>
+        
+        {/* Sistema de Pestañas */}
+        <div className="bg-white rounded-xl shadow-md p-2 flex items-center gap-2">
+          {/* Botón Scroll Izquierda */}
+          {cierres.length > 3 && (
             <button
-              onClick={handleCerrarCaja}
-              className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition"
+              onClick={() => scrollTabs("left")}
+              className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-lg transition"
             >
-              Cerrar Caja
+              <FaChevronLeft className="text-gray-600" />
             </button>
+          )}
+
+          {/* Contenedor de Pestañas con Scroll */}
+          <div
+            ref={tabsContainerRef}
+            className="flex-1 flex gap-2 overflow-x-auto scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {/* ✅ Pestaña Caja Actual - PRIMERO (Izquierda) */}
+            <button
+              onClick={() => setCajaSeleccionada("actual")}
+              className={`flex-shrink-0 px-4 py-2 rounded-lg font-medium transition ${
+                cajaSeleccionada === "actual"
+                  ? "bg-green-600 text-white shadow-lg"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              <div className="text-sm font-bold">🟢 Actual</div>
+              <div className="text-xs opacity-75">En curso</div>
+            </button>
+
+            {/* ✅ Pestañas de Cierres Anteriores (Más reciente → Más antiguo) */}
+            {cierres.map((cierre) => (
+              <button
+                key={cierre.id}
+                onClick={() => setCajaSeleccionada(cierre.id)}
+                className={`flex-shrink-0 px-4 py-2 rounded-lg font-medium transition ${
+                  cajaSeleccionada === cierre.id
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <div className="text-sm">
+                  {cierre.tipo_cierre_display} #{cierre.id}
+                </div>
+                <div className="text-xs opacity-75">
+                  {new Date(cierre.fecha_fin).toLocaleDateString('es-CO', { 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Botón Scroll Derecha */}
+          {cierres.length > 3 && (
+            <button
+              onClick={() => scrollTabs("right")}
+              className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-lg transition"
+            >
+              <FaChevronRight className="text-gray-600" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ✅ OVERLAY DE CARGA AL CAMBIAR PESTAÑA */}
+      {loadingCambio && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+            <FaSpinner className="animate-spin text-5xl text-blue-600 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-gray-800">Cargando datos...</p>
+            <p className="text-sm text-gray-500 mt-2">Por favor espere</p>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ========== SALDO CAJA INICIAL (CUENTAS) ========== */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
-          <FaMoneyBillWave className="text-green-500" />
-          Saldo Caja Inicial
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {cuentas.map((cuenta) => (
-            <div key={cuenta.id} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition">
-              <p className="text-sm font-bold text-gray-700 mb-2">{cuenta.nombre}</p>
-              <p className={`text-xl font-bold ${claseMonto(cuenta.saldo_actual)}`}> 
-                {formatearMonto(cuenta.saldo_actual)}
-              </p>
+      {/* ========== CONTENIDO DE LA CAJA SELECCIONADA ========== */}
+      {datosVista && !loadingCambio && (
+        <>
+          {/* ========== RESUMEN SUPERIOR ========== */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {datosVista.esActual ? (
+              <>
+                {/* Total Bruto */}
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg">
+                  <p className="text-sm opacity-90">Total Bruto</p>
+                  <p className="text-3xl font-bold">
+                    {formatearMonto(datosVista.totalBruto)}
+                  </p>
+                  <p className="text-xs mt-2 opacity-75">Dinero disponible en cuentas</p>
+                </div>
+
+                {/* Total Neto */}
+                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
+                  <p className="text-sm opacity-90">Total Neto</p>
+                  <p className="text-3xl font-bold">
+                    {formatearMonto(datosVista.totalNeto)}
+                  </p>
+                  <p className="text-xs mt-2 opacity-75">Bruto + Por Cobrar - Por Pagar</p>
+                </div>
+
+                {/* Por Cobrar / Pagar */}
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm opacity-90">Por Cobrar:</span>
+                    <span className="font-semibold">{formatearMonto(datosVista.totalPorCobrar)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm opacity-90">Por Pagar:</span>
+                    <span className="font-semibold text-red-200">{formatearMonto(datosVista.totalPorPagar)}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Saldo Inicial */}
+                <div className="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-xl p-6 shadow-lg">
+                  <p className="text-sm opacity-90">Saldo Inicial</p>
+                  <p className="text-3xl font-bold">
+                    {formatearMonto(datosVista.saldoInicial)}
+                  </p>
+                  <p className="text-xs mt-2 opacity-75">Al inicio del período</p>
+                </div>
+
+                {/* Entradas y Salidas */}
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm opacity-90">Entradas:</span>
+                    <span className="font-semibold text-green-200">{formatearMonto(datosVista.totalEntradas)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm opacity-90">Salidas:</span>
+                    <span className="font-semibold text-red-200">{formatearMonto(datosVista.totalSalidas)}</span>
+                  </div>
+                </div>
+
+                {/* Saldo Final */}
+                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
+                  <p className="text-sm opacity-90">Saldo Final</p>
+                  <p className="text-3xl font-bold">
+                    {formatearMonto(datosVista.totalBruto)}
+                  </p>
+                  <p className="text-xs mt-2 opacity-75">Al cierre del período</p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ========== INFORMACIÓN DEL CIERRE ========== */}
+          {!datosVista.esActual && (
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Fecha Inicio</p>
+                  <p className="font-semibold text-gray-800">
+                    {new Date(datosVista.fechaInicio).toLocaleDateString('es-CO')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Fecha Cierre</p>
+                  <p className="font-semibold text-gray-800">
+                    {new Date(datosVista.fechaFin).toLocaleDateString('es-CO')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Cerrado por</p>
+                  <p className="font-semibold text-gray-800">{datosVista.cerradoPor || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Movimientos</p>
+                  <p className="font-semibold text-gray-800">{datosVista.movimientos.length}</p>
+                </div>
+              </div>
+              {datosVista.observaciones && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">Observaciones</p>
+                  <p className="text-sm text-gray-800">{datosVista.observaciones}</p>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-        <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-          <span className="text-sm font-semibold text-gray-700">TOTAL</span>
-          <span className={`text-2xl font-bold ${claseMonto(totalBruto)}`}>
-            {formatearMonto(totalBruto)}
-          </span>
-        </div>
-      </div>
+          )}
 
-      {/* ========== TABLAS DE MOVIMIENTOS ========== */}
-      
-      {/* VENTAS */}
-      <TablaMovimientos
-        titulo="VENTAS"
-        color="bg-green-500"
-        datos={ventas}
-        columnas={["#", "Cliente", "Producto", "Medio Pago", "Total"]}
-        renderFila={(mov) => (
-          <>
-            <td className="px-4 py-3">{mov.venta_info?.id}</td>
-            <td className="px-4 py-3">{mov.descripcion.split(" - ")[1] || "—"}</td>
-            <td className="px-4 py-3 text-center">
-              <button
-                onClick={() => abrirModalDetalle(mov)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                <FaEye size={18} />
-              </button>
-            </td>
-            <td className="px-4 py-3">{mov.tipo_movimiento.nombre}</td>
-            <td className="px-4 py-3 text-right font-semibold">
-              {formatearMonto(mov.monto)}
-            </td>
-          </>
-        )}
-      />
+          {/* ========== FECHAS DE CAJA (Solo para caja actual) ========== */}
+          {datosVista.esActual && (
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Fecha de Inicio</label>
+                    <input
+                      type="date"
+                      value={fechaInicio}
+                      onChange={(e) => setFechaInicio(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                </div>
 
-      {/* COMPRAS */}
-      <TablaMovimientos
-        titulo="COMPRAS"
-        color="bg-red-500"
-        datos={compras}
-        columnas={["#", "Proveedor", "Tipo Material", "Medio Pago", "Total"]}
-        renderFila={(mov) => (
-          <>
-            <td className="px-4 py-3">{mov.compra_info?.id}</td>
-            <td className="px-4 py-3">{mov.descripcion.split(" - ")[1] || "—"}</td>
-            <td className="px-4 py-3 text-center">
-              <button
-                onClick={() => abrirModalDetalle(mov)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                <FaEye size={18} />
-              </button>
-            </td>
-            <td className="px-4 py-3">{mov.tipo_movimiento.nombre}</td>
-            <td className="px-4 py-3 text-right font-semibold">
-              {formatearMonto(mov.monto)}
-            </td>
-          </>
-        )}
-      />
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Fecha de Cierre</label>
+                    <input
+                      type="date"
+                      value={fechaFin}
+                      onChange={(e) => setFechaFin(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-2"
+                    />
+                  </div>
+                  <button
+                    onClick={handleCerrarCaja}
+                    className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition"
+                  >
+                    Cerrar Caja
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
-      
-      <TablaMovimientos
-        titulo="INGRESOS (Pagos de Clientes)"
-        color="bg-blue-500"
-        datos={cuotasEntrada}
-        columnas={["Venta #", "Cliente", "Medio Pago", "Total"]}
-        renderFila={(mov) => {
-          // ✅ Extraer el ID de venta desde la descripción
-          const ventaId = mov.descripcion.match(/Venta #(\d+)/)?.[1] || "—";
-          const clienteNombre = mov.descripcion.split(" - ")[0]?.replace("Abono de cliente ", "") || "—";
+          {/* ========== SALDO POR CUENTA ========== */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <FaMoneyBillWave className="text-green-500" />
+              {datosVista.esActual ? "Saldo Caja Inicial" : "Saldo al Cierre"}
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {datosVista.cuentas.map((cuenta, idx) => (
+                <div key={idx} className="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition">
+                  <p className="text-sm font-bold text-gray-700 mb-2">
+                    {datosVista.esActual ? cuenta.nombre : cuenta.cuenta_nombre}
+                  </p>
+                  <p className={`text-xl font-bold ${claseMonto(datosVista.esActual ? cuenta.saldo_actual : cuenta.saldo)}`}>
+                    {formatearMonto(datosVista.esActual ? cuenta.saldo_actual : cuenta.saldo)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-700">TOTAL</span>
+              <span className={`text-2xl font-bold ${claseMonto(datosVista.totalBruto)}`}>
+                {formatearMonto(datosVista.totalBruto)}
+              </span>
+            </div>
+          </div>
 
-          return (
-            <>
-              <td className="px-4 py-3 font-mono text-blue-600">#{ventaId}</td>
-              <td className="px-4 py-3">{clienteNombre}</td>
-              <td className="px-4 py-3">{mov.tipo_movimiento.nombre}</td>
-              <td className="px-4 py-3 text-right font-semibold">
-                {formatearMonto(mov.monto)}
-              </td>
-            </>
-          );
-        }}
-      />
+          {/* ========== TABLAS DE MOVIMIENTOS ========== */}
+          
+          {/* VENTAS */}
+          <TablaMovimientos
+            titulo="VENTAS"
+            color="bg-green-500"
+            datos={ventas}
+            columnas={["#", "Cliente", "Producto", "Medio Pago", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => (
+              <>
+                <td className="px-4 py-3">{mov.venta || mov.venta_info?.id || "—"}</td>
+                <td className="px-4 py-3">{mov.descripcion.split(" - ")[1] || "—"}</td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => abrirModalDetalle(mov)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <FaEye size={18} />
+                  </button>
+                </td>
+                <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                <td className="px-4 py-3 text-right font-semibold">
+                  {formatearMonto(mov.monto)}
+                </td>
+              </>
+            )}
+          />
 
-      
-      <TablaMovimientos
-        titulo="EGRESOS (Pagos a Proveedores)"
-        color="bg-orange-500"
-        datos={cuotasSalida}
-        columnas={["Compra #", "Proveedor", "Medio Pago", "Total"]}
-        renderFila={(mov) => {
-          // ✅ Extraer el ID de compra desde la descripción
-          const compraId = mov.descripcion.match(/Compra #(\d+)/)?.[1] || "—";
-          const proveedorNombre = mov.descripcion.split(" - ")[0]?.replace("Abono a proveedor ", "") || "—";
+          {/* COMPRAS */}
+          <TablaMovimientos
+            titulo="COMPRAS"
+            color="bg-red-500"
+            datos={compras}
+            columnas={["#", "Proveedor", "Tipo Material", "Medio Pago", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => (
+              <>
+                <td className="px-4 py-3">{mov.compra || mov.compra_info?.id || "—"}</td>
+                <td className="px-4 py-3">{mov.descripcion.split(" - ")[1] || "—"}</td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => abrirModalDetalle(mov)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <FaEye size={18} />
+                  </button>
+                </td>
+                <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                <td className="px-4 py-3 text-right font-semibold">
+                  {formatearMonto(mov.monto)}
+                </td>
+              </>
+            )}
+          />
 
-          return (
-            <>
-              <td className="px-4 py-3 font-mono text-orange-600">#{compraId}</td>
-              <td className="px-4 py-3">{proveedorNombre}</td>
-              <td className="px-4 py-3">{mov.tipo_movimiento.nombre}</td>
-              <td className="px-4 py-3 text-right font-semibold">
-                {formatearMonto(mov.monto)}
-              </td>
-            </>
-          );
-        }}
-      />
+          {/* INGRESOS (Pagos de Clientes) */}
+          <TablaMovimientos
+            titulo="INGRESOS (Pagos de Clientes)"
+            color="bg-blue-500"
+            datos={cuotasEntrada}
+            columnas={["Venta #", "Cliente", "Medio Pago", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const ventaId = mov.descripcion.match(/Venta #(\d+)/)?.[1] || "—";
+              const clienteNombre = mov.descripcion.split(" - ")[0]?.replace("Abono de cliente ", "") || "—";
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-blue-600">#{ventaId}</td>
+                  <td className="px-4 py-3">{clienteNombre}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-right font-semibold">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+
+          {/* EGRESOS (Pagos a Proveedores) */}
+          <TablaMovimientos
+            titulo="EGRESOS (Pagos a Proveedores)"
+            color="bg-orange-500"
+            datos={cuotasSalida}
+            columnas={["Compra #", "Proveedor", "Medio Pago", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const compraId = mov.descripcion.match(/Compra #(\d+)/)?.[1] || "—";
+              const proveedorNombre = mov.descripcion.split(" - ")[0]?.replace("Abono a proveedor ", "") || "—";
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-orange-600">#{compraId}</td>
+                  <td className="px-4 py-3">{proveedorNombre}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-right font-semibold">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+
+          {/* ✅ NUEVO: INGRESOS OPERATIVOS */}
+          <TablaMovimientos
+            titulo="INGRESOS OPERATIVOS (Otros Ingresos)"
+            color="bg-teal-500"
+            datos={ingresosOperativos}
+            columnas={["#", "Descripción", "Medio Pago", "Fecha", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const ingresoId = mov.ingreso || mov.ingreso_info?.id || "—";
+              const descripcion = mov.ingreso_info?.descripcion || 
+                                 mov.descripcion.split(" - ")[1] || 
+                                 mov.descripcion;
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-teal-600">#{ingresoId}</td>
+                  <td className="px-4 py-3">{descripcion}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-teal-700">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+
+           {/* ✅ NUEVO: EGRESOS OPERATIVOS */}
+          <TablaMovimientos
+            titulo="EGRESOS OPERATIVOS (Gastos del Negocio)"
+            color="bg-red-600"
+            datos={egresosOperativos}
+            columnas={["#", "Descripción", "Medio Pago", "Fecha", "Total"]}
+            esActual={datosVista.esActual}
+            renderFila={(mov) => {
+              const egresoId = mov.egreso || mov.egreso_info?.id || "—";
+              const descripcion = mov.egreso_info?.descripcion || 
+                                 mov.descripcion.split(" - ")[1] || 
+                                 mov.descripcion;
+
+              return (
+                <>
+                  <td className="px-4 py-3 font-mono text-red-600">#{egresoId}</td>
+                  <td className="px-4 py-3">{descripcion}</td>
+                  <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString('es-CO')}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-red-700">
+                    {formatearMonto(mov.monto)}
+                  </td>
+                </>
+              );
+            }}
+          />
+        </>
+      )}
 
       {/* ========== MODAL DE DETALLES ========== */}
       {modalDetalle && (
         <ModalDetalleMovimiento
           movimiento={modalDetalle}
           onClose={cerrarModalDetalle}
+          esActual={datosVista?.esActual}
         />
       )}
     </div>
@@ -403,13 +773,14 @@ const Caja = () => {
 // =============================================
 // COMPONENTE: TABLA DE MOVIMIENTOS
 // =============================================
-const TablaMovimientos = ({ titulo, color, datos, columnas, renderFila }) => {
+const TablaMovimientos = ({ titulo, color, datos, columnas, renderFila, esActual }) => {
   if (datos.length === 0) return null;
 
   return (
     <div className="mb-6">
-      <div className={`${color} text-white px-4 py-2 rounded-t-lg font-semibold`}>
-        {titulo}
+      <div className={`${color} text-white px-4 py-2 rounded-t-lg font-semibold flex justify-between items-center`}>
+        <span>{titulo}</span>
+        <span className="text-sm opacity-90">({datos.length} registros)</span>
       </div>
       <div className="bg-white rounded-b-lg shadow-md overflow-hidden">
         <table className="w-full">
@@ -438,7 +809,7 @@ const TablaMovimientos = ({ titulo, color, datos, columnas, renderFila }) => {
 // =============================================
 // COMPONENTE: MODAL DE DETALLES (MEJORADO)
 // =============================================
-const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
+const ModalDetalleMovimiento = ({ movimiento, onClose, esActual }) => {
   const [detalles, setDetalles] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -451,16 +822,31 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
     try {
       let url = "";
       
-      // Determinar si es venta o compra
-      if (movimiento.venta_info) {
-        url = apiUrl(`/compra_venta/ventas/${movimiento.venta_info.id}/`);
-      } else if (movimiento.compra_info) {
-        url = apiUrl(`/compra_venta/compras/${movimiento.compra_info.id}/`);
+      // ✅ Determinar si es venta o compra (maneja ambos formatos)
+      const ventaId = movimiento.venta || movimiento.venta_info?.id;
+      const compraId = movimiento.compra || movimiento.compra_info?.id;
+      
+      if (ventaId) {
+        url = apiUrl(`/compra_venta/ventas/${ventaId}/`);
+      } else if (compraId) {
+        url = apiUrl(`/compra_venta/compras/${compraId}/`);
       }
 
       if (url) {
         const res = await fetch(url);
         const data = await res.json();
+        
+        // ✅ Cargar tipos de oro ANTES de actualizar el estado
+        if (data.prendas && data.prendas.length > 0) {
+          const prendasConTipo = await Promise.all(
+            data.prendas.map(async (prenda) => {
+              const tipo_oro = await obtenerTipoOro(prenda.prenda);
+              return { ...prenda, tipo_oro };
+            })
+          );
+          data.prendas = prendasConTipo;
+        }
+        
         setDetalles(data);
       }
     } catch (err) {
@@ -471,51 +857,39 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
   };
 
   const formatearMonto = (monto) => {
-    return `$${parseFloat(monto || 0).toLocaleString("es-CO", { 
+    return `${parseFloat(monto || 0).toLocaleString("es-CO", { 
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     })}`;
   };
 
-  // ✅ Función de impresión mejorada
-  const handleImprimir = () => {
-    const contenidoModal = document.getElementById('modal-recibo-contenido');
-    if (!contenidoModal) return;
-
-    const ventanaImpresion = window.open('', '_blank');
-    ventanaImpresion.document.write(`
-      <html>
-        <head>
-          <title>Recibo - Movimiento #${movimiento.venta_info?.id || movimiento.compra_info?.id}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f3f4f6; font-weight: bold; }
-            .total { font-size: 24px; font-weight: bold; color: #1e40af; }
-            @media print {
-              button { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${contenidoModal.innerHTML}
-        </body>
-      </html>
-    `);
-    ventanaImpresion.document.close();
-    ventanaImpresion.print();
+  // ✅ Función para obtener tipo de oro desde los datos de inventario
+  const obtenerTipoOro = async (prendaId) => {
+    try {
+      const res = await fetch(apiUrl(`/prendas/prendas/${prendaId}/`));
+      const prenda = await res.json();
+      return prenda.tipo_oro_nombre || "—";
+    } catch (err) {
+      console.error("Error obteniendo tipo de oro:", err);
+      return "—";
+    }
   };
+
+  // ✅ Obtener nombre del tipo de movimiento
+  const nombreTipoMovimiento = movimiento.tipo_movimiento_nombre || movimiento.tipo_movimiento?.nombre || "—";
+  
+  // ✅ Obtener ID de venta/compra
+  const idMovimiento = movimiento.venta || movimiento.venta_info?.id || movimiento.compra || movimiento.compra_info?.id;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header del Modal */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-t-2xl flex justify-between items-center z-10">
           <div>
             <h3 className="text-2xl font-bold">📄 Recibo de Movimiento</h3>
             <p className="text-sm opacity-90">
-              {movimiento.tipo_movimiento.nombre} • {new Date(movimiento.fecha).toLocaleDateString("es-CO")}
+              {nombreTipoMovimiento} • {new Date(movimiento.fecha).toLocaleDateString("es-CO")}
             </p>
           </div>
           <button
@@ -528,8 +902,8 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
           </button>
         </div>
 
-        {/* Contenido del Modal */}
-        <div className="p-6">
+        {/* Contenido imprimible */}
+        <div id="modal-recibo-contenido" className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -542,18 +916,18 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Número</p>
                     <p className="text-lg font-semibold text-gray-800">
-                      #{movimiento.venta_info?.id || movimiento.compra_info?.id}
+                      #{idMovimiento}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Tipo</p>
                     <p className="text-lg font-semibold text-gray-800">
-                      {movimiento.tipo_movimiento.nombre}
+                      {nombreTipoMovimiento}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">
-                      {movimiento.venta_info ? "Cliente" : "Proveedor"}
+                      {movimiento.venta || movimiento.venta_info ? "Cliente" : "Proveedor"}
                     </p>
                     <p className="text-lg font-semibold text-gray-800">
                       {detalles?.cliente_nombre || detalles?.proveedor_nombre || "—"}
@@ -579,7 +953,7 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
                 )}
               </div>
 
-              {/* ✅ Tabla de Prendas - CORREGIR EL MATERIAL */}
+              {/* Tabla de Prendas */}
               {detalles?.prendas && detalles.prendas.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -588,73 +962,100 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
                   </h4>
                   
                   <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Prenda
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Material
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Gramos
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Precio/g
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Cant.
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Subtotal
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {detalles.prendas.map((prenda, idx) => (
-                          <tr key={idx} className="bg-white hover:bg-blue-50/30 transition">
-                            <td className="px-4 py-3">
-                              <span className="font-medium text-gray-800">
-                                {prenda.prenda_nombre}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {/* ✅ CORREGIDO: Usar tipo_oro en lugar de tipo_prenda */}
-                              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
-                                ${prenda.tipo_oro === "ITALIANO" 
-                                  ? "bg-yellow-100 text-yellow-800" 
-                                  : prenda.tipo_oro === "NACIONAL"
-                                  ? "bg-gray-100 text-gray-800"
-                                  : "bg-blue-100 text-blue-800"
-                                }`}>
-                                {prenda.tipo_oro || "—"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="font-mono text-gray-700">
-                                {parseFloat(prenda.prenda_gramos || 0).toFixed(2)}g
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="font-mono text-gray-700">
-                                {formatearMonto(prenda.precio_por_gramo)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-semibold text-sm">
-                                {prenda.cantidad}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <span className="font-bold text-gray-900">
-                                {formatearMonto(prenda.subtotal)}
-                              </span>
-                            </td>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                          <tr>
+                            <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Prenda
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Material
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Gramos
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Precio/g
+                            </th>
+                            <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Cant.
+                            </th>
+                            <th className="px-2 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Chat.
+                            </th>
+                            <th className="px-2 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Rec.
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              Subtotal
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {detalles.prendas.map((prenda, idx) => (
+                            <tr key={idx} className="bg-white hover:bg-blue-50/30 transition">
+                              <td className="px-3 py-3">
+                                <span className="font-medium text-gray-800">
+                                  {prenda.prenda_nombre}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                                  ${prenda.tipo_oro === "ITALIANO" 
+                                    ? "bg-yellow-100 text-yellow-800" 
+                                    : prenda.tipo_oro === "NACIONAL"
+                                    ? "bg-gray-100 text-gray-800"
+                                    : "bg-blue-100 text-blue-800"
+                                  }`}>
+                                  {prenda.tipo_oro || "..."}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className="font-mono text-gray-700">
+                                  {parseFloat(prenda.prenda_gramos || 0).toFixed(2)}g
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <span className="font-mono text-gray-700">
+                                  {formatearMonto(prenda.precio_por_gramo)}
+                                </span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-semibold text-sm">
+                                  {prenda.cantidad}
+                                </span>
+                              </td>
+                              {/* Columna Chatarra */}
+                              <td className="px-2 py-3 text-center">
+                                {prenda.es_chatarra ? (
+                                  <svg className="w-5 h-5 mx-auto text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                                  </svg>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              {/* Columna Recuperable */}
+                              <td className="px-2 py-3 text-center">
+                                {prenda.es_recuperable ? (
+                                  <svg className="w-5 h-5 mx-auto text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                                  </svg>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <span className="font-bold text-gray-900">
+                                  {formatearMonto(prenda.subtotal)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}
@@ -721,10 +1122,10 @@ const ModalDetalleMovimiento = ({ movimiento, onClose }) => {
           )}
         </div>
 
-         {/* Footer del Modal */}
+        {/* Footer del Modal */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200 flex justify-end gap-3">
           <button
-            onClick={handleImprimir} // ✅ USAR LA FUNCIÓN PERSONALIZADA
+            onClick={() => window.print()}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
