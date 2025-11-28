@@ -16,10 +16,15 @@ const Clientes = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
 
+  // Unificamos el efecto de carga inicial y búsqueda para evitar doble carga
   useEffect(() => {
-    fetchClientes();
+    const delayDebounce = setTimeout(() => {
+      handleBuscar(searchTerm);
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mostrarArchivados]);
+  }, [searchTerm, mostrarArchivados]);
 
   const fetchClientes = async () => {
     setLoading(true);
@@ -68,15 +73,6 @@ const Clientes = () => {
     }
   };
 
-  useEffect(() => {
-    const delayDebounce = setTimeout(() => {
-      handleBuscar(searchTerm);
-    }, 400);
-
-    return () => clearTimeout(delayDebounce);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
-
   const handleSelect = async (clienteId) => {
     if (selectedClient?.id === clienteId) {
       setSelectedClient(null);
@@ -122,9 +118,8 @@ const Clientes = () => {
   // Archivar / Desarchivar cliente
   const handleArchive = async (cliente) => {
     try {
-      const endpoint = apiUrl(`terceros/clientes/${cliente.id}/${
-        mostrarArchivados ? 'desarchivar' : 'archivar'
-      }/`);
+      const endpoint = apiUrl(`terceros/clientes/${cliente.id}/${mostrarArchivados ? 'desarchivar' : 'archivar'
+        }/`);
 
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -144,9 +139,9 @@ const Clientes = () => {
       }
 
       const data = await response.json();
-      
+
       await fetchClientes();
-      
+
       if (selectedClient?.id === cliente.id) {
         setSelectedClient(null);
       }
@@ -194,14 +189,16 @@ const Clientes = () => {
   return (
     <div className="p-6 max-w-6xl mx-auto relative">
       <div className="absolute right-4 top-6 flex gap-3">
-        <button
-          onClick={handleCreateClick}
-          className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition flex items-center gap-2"
-          title="Crear cliente"
-        >
-          <span className="text-xl">+</span>
-          Crear
-        </button>
+        {!mostrarArchivados && (
+          <button
+            onClick={handleCreateClick}
+            className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition flex items-center gap-2"
+            title="Crear cliente"
+          >
+            <span className="text-xl">+</span>
+            Crear
+          </button>
+        )}
 
         <button
           onClick={() => setMostrarArchivados((s) => !s)}
@@ -214,8 +211,8 @@ const Clientes = () => {
 
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Clientes</h1>
 
-      <ClientSearchBar 
-        searchTerm={searchTerm} 
+      <ClientSearchBar
+        searchTerm={searchTerm}
         onSearch={setSearchTerm}
         placeholder={mostrarArchivados ? "Buscar clientes archivados..." : "Buscar cliente..."}
       />

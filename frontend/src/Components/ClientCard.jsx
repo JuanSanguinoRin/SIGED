@@ -4,7 +4,7 @@ import {
   FaEnvelope,
   FaEdit,
   FaChevronDown,
-  FaTrash,
+  FaArchive,
   FaTimes,
 } from "react-icons/fa";
 
@@ -56,7 +56,7 @@ const ClientCard = ({ cliente, onEdit, onSelect, onArchive, isOpen, mostrarArchi
               className="text-red-500 hover:text-red-700 transition"
               title="Archivar cliente"
             >
-              <FaTrash size={18} />
+              <FaArchive size={18} />
             </button>
           ) : (
             <button

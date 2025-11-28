@@ -6,7 +6,7 @@ import {
   FaEnvelope,
   FaMapMarkerAlt,
   FaEdit,
-  FaTrash,
+  FaArchive,
   FaChevronDown,
   FaTimes,
   FaPlus,
@@ -23,10 +23,12 @@ const Proveedores = () => {
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [modalCrear, setModalCrear] = useState(false);
 
+  // Unificamos el efecto de carga inicial y búsqueda
   useEffect(() => {
-    fetchProveedores();
+    const delay = setTimeout(() => handleBuscar(searchTerm), 400);
+    return () => clearTimeout(delay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mostrarArchivados]);
+  }, [searchTerm, mostrarArchivados]);
 
   const fetchProveedores = async () => {
     setLoading(true);
@@ -64,12 +66,6 @@ const Proveedores = () => {
     }
   };
 
-  useEffect(() => {
-    const delay = setTimeout(() => handleBuscar(searchTerm), 400);
-    return () => clearTimeout(delay);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
-
   const handleSelect = async (proveedor) => {
     if (selectedProveedor?.id === proveedor.id) {
       setSelectedProveedor(null);
@@ -101,9 +97,8 @@ const Proveedores = () => {
 
   const handleArchive = async (proveedor) => {
     try {
-      const endpoint = apiUrl(`terceros/proveedores/${proveedor.id}/${
-        mostrarArchivados ? 'desarchivar' : 'archivar'
-      }/`);
+      const endpoint = apiUrl(`terceros/proveedores/${proveedor.id}/${mostrarArchivados ? 'desarchivar' : 'archivar'
+        }/`);
 
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -123,9 +118,9 @@ const Proveedores = () => {
       }
 
       const data = await response.json();
-      
+
       await fetchProveedores();
-      
+
       if (selectedProveedor?.id === proveedor.id) {
         setSelectedProveedor(null);
       }
@@ -177,13 +172,15 @@ const Proveedores = () => {
   return (
     <div className="p-6 max-w-5xl mx-auto relative">
       <div className="absolute right-4 top-6 flex gap-3">
-        <button
-          onClick={() => setModalCrear(true)}
-          className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition flex items-center gap-2"
-          title="Crear proveedor"
-        >
-          <FaPlus /> Crear
-        </button>
+        {!mostrarArchivados && (
+          <button
+            onClick={() => setModalCrear(true)}
+            className="bg-white/70 backdrop-blur-sm border border-gray-200 px-3 py-2 rounded-lg shadow hover:shadow-md transition flex items-center gap-2"
+            title="Crear proveedor"
+          >
+            <FaPlus /> Crear
+          </button>
+        )}
 
         <button
           onClick={() => setMostrarArchivados((s) => !s)}
@@ -254,7 +251,7 @@ const Proveedores = () => {
                       className="text-red-500 hover:text-red-700 transition"
                       title="Archivar proveedor"
                     >
-                      <FaTrash size={18} />
+                      <FaArchive size={18} />
                     </button>
                   ) : (
                     <button
@@ -278,9 +275,8 @@ const Proveedores = () => {
                     title="Ver detalle"
                   >
                     <FaChevronDown
-                      className={`w-6 h-6 transform transition-transform duration-300 ${
-                        selectedProveedor?.id === proveedor.id ? "rotate-180" : ""
-                      }`}
+                      className={`w-6 h-6 transform transition-transform duration-300 ${selectedProveedor?.id === proveedor.id ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
                 </div>

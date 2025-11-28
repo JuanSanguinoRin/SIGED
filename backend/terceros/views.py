@@ -18,14 +18,15 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         Filtra por proveedores archivados o no según el parámetro.
         Ejemplo: ?archivado=true
         """
-        # 🔹 Para las acciones de archivar/desarchivar, devolver TODOS
-        if self.action in ['archivar', 'desarchivar']:
+        # 🔹 Para acciones que requieren el objeto específico (detalle, update, archivar), devolver TODOS
+        if self.action in ['retrieve', 'update', 'partial_update', 'archivar', 'desarchivar']:
             return Proveedor.objects.all()
         
+        # Para listar, filtrar por estado
         archivado = self.request.query_params.get("archivado", "false").lower()
         if archivado == "true":
-            return Proveedor.objects.filter(archivado=True)
-        return Proveedor.objects.filter(archivado=False)
+            return Proveedor.objects.filter(archivado=True).order_by('nombre')
+        return Proveedor.objects.filter(archivado=False).order_by('nombre')
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -46,7 +47,10 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         if not nombre:
             return Response({"error": "Debe proporcionar un nombre."}, status=status.HTTP_400_BAD_REQUEST)
 
-        proveedores = Proveedor.objects.filter(nombre__icontains=nombre, archivado=False)
+        # Permitir buscar en todos (activos e inactivos) si es necesario, o solo activos
+        # Por defecto buscamos en activos, pero si el usuario quiere buscar archivados debería usar el filtro
+        # Aquí asumimos búsqueda general en activos
+        proveedores = Proveedor.objects.filter(nombre__icontains=nombre, archivado=False).order_by('nombre')
         if not proveedores.exists():
             return Response({"error": "No se encontraron proveedores."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -85,14 +89,15 @@ class ClienteViewSet(viewsets.ModelViewSet):
     serializer_class = ClienteSerializer
 
     def get_queryset(self):
-        # 🔹 Para las acciones de archivar/desarchivar, devolver TODOS
-        if self.action in ['archivar', 'desarchivar']:
+        # 🔹 Para acciones que requieren el objeto específico, devolver TODOS
+        if self.action in ['retrieve', 'update', 'partial_update', 'archivar', 'desarchivar']:
             return Cliente.objects.all()
         
+        # Para listar
         archivado = self.request.query_params.get("archivado", "false").lower()
         if archivado == "true":
-            return Cliente.objects.filter(archivado=True)
-        return Cliente.objects.filter(archivado=False)
+            return Cliente.objects.filter(archivado=True).order_by('nombre')
+        return Cliente.objects.filter(archivado=False).order_by('nombre')
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -126,7 +131,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if not nombre:
             return Response({"error": "Debe proporcionar un nombre."}, status=status.HTTP_400_BAD_REQUEST)
 
-        clientes = Cliente.objects.filter(nombre__icontains=nombre, archivado=False)
+        clientes = Cliente.objects.filter(nombre__icontains=nombre, archivado=False).order_by('nombre')
         if not clientes.exists():
             return Response({"error": "No se encontraron clientes."}, status=status.HTTP_404_NOT_FOUND)
 
