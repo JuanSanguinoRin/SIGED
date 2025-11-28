@@ -98,6 +98,7 @@ DATABASES = {
         'HOST': 'pg-67749f1-ufps-fd2a.l.aivencloud.com',
         'PORT': '13485',
         'OPTIONS': {'sslmode': 'require'},
+        'CONN_MAX_AGE': 60,
     }
 }
 

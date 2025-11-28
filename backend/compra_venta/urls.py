@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import CompraViewSet, VentaViewSet
+from .dashboard_view import DashboardResumenView
 
 # Crear el router para registrar los viewsets
 router = DefaultRouter()
@@ -10,6 +11,7 @@ router.register(r'ventas', VentaViewSet, basename='venta')
 # URLs de la aplicación
 urlpatterns = [
     path('', include(router.urls)),
+    path('dashboard/resumen/', DashboardResumenView.as_view(), name='dashboard-resumen'),
 ]
 
 # Estructura de URLs disponibles:
