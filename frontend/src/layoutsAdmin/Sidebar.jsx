@@ -36,35 +36,36 @@ export default function Sidebar({
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="p-4 hidden md:block">
-          <button
-            onClick={onToggle}
-            className={`w-full text-left font-semibold text-white hover:text-purple-400 transition-colors ${
-              collapsed ? "flex justify-center" : ""
-            }`}
-            aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
-          >
-            {collapsed ? (
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            ) : (
-              <span className="text-base">Menú</span>
-            )}
-          </button>
-        </div>
+        <div className="flex flex-col h-full">
+          <div className="p-4 hidden md:block">
+            <button
+              onClick={onToggle}
+              className={`w-full text-left font-semibold text-white hover:text-purple-400 transition-colors ${
+                collapsed ? "flex justify-center" : ""
+              }`}
+              aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
+            >
+              {collapsed ? (
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              ) : (
+                <span className="text-base">Menú</span>
+              )}
+            </button>
+          </div>
 
-        <nav className="px-4 mt-2 space-y-1 text-white">
+          <nav className="flex-1 px-4 mt-2 space-y-1 text-white overflow-y-auto">
           <NavLink
             to="/admin"
             end
@@ -216,7 +217,8 @@ export default function Sidebar({
           >
             <FaMoneyBillAlt /> {!collapsed && "Egresos"}
           </NavLink>
-        </nav>
+          </nav>
+        </div>
       </aside>
     </>
   );
