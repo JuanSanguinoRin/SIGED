@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "siged-production.up.railway.app";
 
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
