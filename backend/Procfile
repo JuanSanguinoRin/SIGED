@@ -1,1 +1,1 @@
-web: gunicorn SIGED.wsgi
+web: gunicorn siged.wsgi:application --bind 0.0.0.0:$PORT
