@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../css/Modal.css";
+import { FaPlus } from "react-icons/fa";
 
 export default function ModalAgregarProducto({ onClose, onAdd }) {
   const [nombre, setNombre] = useState("");
@@ -30,7 +31,6 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
       es_chatarra: esChatarra,
       es_recuperable: esRecuperable,
       gramos,
-
       archivado: false,
     };
 
@@ -41,12 +41,12 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
     });
 
     if (res.ok) {
-    const nuevaPrenda = await res.json();
-    onAdd(nuevaPrenda); // 🔹 enviamos la nueva prenda al padre
-    onClose();
-  } else {
-    const err = await res.json();
-    alert("Error: " + (err.error || "No se pudo guardar"));
+      const nuevaPrenda = await res.json();
+      onAdd(nuevaPrenda); // 🔹 enviamos la nueva prenda al padre
+      onClose();
+    } else {
+      const err = await res.json();
+      alert("Error: " + (err.error || "No se pudo guardar"));
     }
   };
 
@@ -68,10 +68,13 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
     }
   };
 
-   return (
+  return (
     <div className="modal-overlay">
       <div className="modal-contenido">
-        <h2>➕ Añadir Producto</h2>
+        <h2>
+          <FaPlus size={20} />
+          Añadir Producto
+        </h2>
         <form onSubmit={handleGuardar} className="form-producto">
           <input
             type="text"
@@ -165,8 +168,6 @@ export default function ModalAgregarProducto({ onClose, onAdd }) {
             onChange={(e) => setGramos(e.target.value)}
             required
           />
-
-          
 
           <div className="modal-botones espaciar">
             <button type="button" className="btn-cancelar" onClick={onClose}>

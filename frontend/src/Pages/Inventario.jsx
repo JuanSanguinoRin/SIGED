@@ -4,12 +4,13 @@ import ModalEditar from "../Components/ModalEditar";
 import ModalArchivar from "../Components/ModalArchivar";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
 import ModalArchivados from "../Components/ModalArchivados";
-import { FaBox, FaPlus, FaCheck, FaTimes } from "react-icons/fa";
-import { MdArchive, MdUnarchive } from "react-icons/md";
+import { FaBox, FaPlus, FaCheck, FaTimes, FaWeight, FaHashtag, FaTag, FaGem, FaLayerGroup } from "react-icons/fa";
+import { MdArchive, MdUnarchive, MdCategory } from "react-icons/md";
 import { TbEdit } from "react-icons/tb";
+import { BiPackage } from "react-icons/bi";
+import { GiGoldBar, GiRecycle } from "react-icons/gi";
+import { RiRecycleLine } from "react-icons/ri";
 import { apiUrl } from "../config/api";
-
-
 
 export default function Inventario() {
   const [prendas, setPrendas] = useState([]);
@@ -43,47 +44,51 @@ export default function Inventario() {
   }, []);
 
   // Calculamos los totales agrupados solo una vez
-const resumenPorOro = (tipoOro) => {
-  const prendasOro = prendas.filter(p => p.tipo_oro_nombre === tipoOro);
+  const resumenPorOro = (tipoOro) => {
+    const prendasOro = prendas.filter(p => p.tipo_oro_nombre === tipoOro);
 
-  // gramos de prendas (normales: no chatarra ni recuperable)
-  const gramosPrendas = prendasOro
-    .filter(p => !p.es_chatarra && !p.es_recuperable)
-    .reduce((acc, p) => {
-      const gramos = parseFloat(p.gramos || 0);
-      const existencia = parseFloat(p.existencia || 0);
-      return acc + gramos * existencia;
-    }, 0);
+    // gramos de prendas (normales: no chatarra ni recuperable)
+    const gramosPrendas = prendasOro
+      .filter(p => !p.es_chatarra && !p.es_recuperable)
+      .reduce((acc, p) => {
+        const gramos = parseFloat(p.gramos || 0);
+        const existencia = parseFloat(p.existencia || 0);
+        return acc + gramos * existencia;
+      }, 0);
 
-  const gramosChatarra = prendasOro
-    .filter(p => p.es_chatarra)
-    .reduce((acc, p) => {
-      const gramos = parseFloat(p.gramos || 0);
-      const existencia = parseFloat(p.existencia || 0);
-      return acc + gramos * existencia;
-    }, 0);
+    const gramosChatarra = prendasOro
+      .filter(p => p.es_chatarra)
+      .reduce((acc, p) => {
+        const gramos = parseFloat(p.gramos || 0);
+        const existencia = parseFloat(p.existencia || 0);
+        return acc + gramos * existencia;
+      }, 0);
 
-  const gramosRecuperable = prendasOro
-    .filter(p => p.es_recuperable)
-    .reduce((acc, p) => {
-      const gramos = parseFloat(p.gramos || 0);
-      const existencia = parseFloat(p.existencia || 0);
-      return acc + gramos * existencia;
-    }, 0);
+    const gramosRecuperable = prendasOro
+      .filter(p => p.es_recuperable)
+      .reduce((acc, p) => {
+        const gramos = parseFloat(p.gramos || 0);
+        const existencia = parseFloat(p.existencia || 0);
+        return acc + gramos * existencia;
+      }, 0);
 
-  const total = gramosPrendas + gramosChatarra + gramosRecuperable;
+    const total = gramosPrendas + gramosChatarra + gramosRecuperable;
 
-  return {
-    prendas: gramosPrendas.toFixed(2),
-    chatarra: gramosChatarra.toFixed(2),
-    recuperable: gramosRecuperable.toFixed(2),
-    total: total.toFixed(2),
+    return {
+      prendas: gramosPrendas.toFixed(2),
+      chatarra: gramosChatarra.toFixed(2),
+      recuperable: gramosRecuperable.toFixed(2),
+      total: total.toFixed(2),
+    };
   };
-};
 
-// Luego en tu JSX:
-const italiano = resumenPorOro("ITALIANO");
-const nacional = resumenPorOro("NACIONAL");
+  // Luego en tu JSX:
+  const italiano = resumenPorOro("ITALIANO");
+  const nacional = resumenPorOro("NACIONAL");
+
+  // Contadores de unidades por tipo de oro
+  const unidadesItaliano = prendas.filter(p => p.tipo_oro_nombre === "ITALIANO").length;
+  const unidadesNacional = prendas.filter(p => p.tipo_oro_nombre === "NACIONAL").length;
 
   // 🔹 Filtrado
   const prendasFiltradas = prendas.filter((p) => {
@@ -100,65 +105,116 @@ const nacional = resumenPorOro("NACIONAL");
 
   return (
     <div className="inventario-container">
-    <div className=" titulo-inventario">
-      <h1 className="text-3xl font-bold text-gray-800">Inventario</h1>
-    </div>
-      
+      <div className="header-inventario">
+        <h1 className="text-3xl font-bold text-gray-800">Inventario</h1>
+        <div className="header-botones">
+          <button onClick={() => setMostrarArchivados(true)} className="btn-archivados btn-flex">
+            <MdUnarchive size={19} /> <span>Archivados</span>
+          </button>
+
+          <button onClick={() => setMostrarAgregar(true)} className="btn-agregar btn-flex">
+            <FaPlus size={16} /> <span>Añadir Producto</span>
+          </button>
+        </div>
+      </div>
 
       {/* 🔹 Panel de resumen mejorado */}
-    <div className="resumen-panel">
-    <div className="resumen-caja italiano">
-        <h3>Italiano</h3>
-    <p>Total gramos: {italiano.total}g</p>
-  <p>Oro: {italiano.prendas}g</p>
-    <p>Chatarra: {italiano.chatarra}g</p>
-    <p>Recuperable: {italiano.recuperable}g</p>
-    </div>
+      <div className="resumen-panel">
+        {/* SECCIÓN ITALIANO */}
+        <div className="resumen-caja resumen-italiano">
+          <div className="resumen-header">
+            <h3>Italiano</h3>
+          </div>
 
-    <div className="resumen-caja nacional">
-        <h3>Nacional</h3>
-    <p>Total gramos: {nacional.total}g</p>
-  <p>Oro: {nacional.prendas}g</p>
-    <p>Chatarra: {nacional.chatarra}g</p>
-    <p>Recuperable: {nacional.recuperable}g</p>
-    </div>
-
-    <div className="resumen-caja general">
-        <h3>General</h3>
-        <p>Productos: {prendas.length}</p>
-        <p>Gramos totales: {prendas
-        .reduce((acc, p) => {
-          const gramos = parseFloat(p.gramos || 0);
-          const existencia = parseFloat(p.existencia || 0);
-          return acc + gramos * existencia;
-        }, 0)
-        .toFixed(2)}g</p>
-    </div>
-
-    <div className="panel-botones">
-        <button onClick={() => setMostrarArchivados(true)} className="btn-archivados btn-flex">
-          <MdUnarchive size={19} /> <span>Archivados</span>
-        </button>
-
-        <button onClick={() => setMostrarAgregar(true)} className="btn-agregar btn-flex">
-          <FaPlus size={16} /> <span>Añadir Producto</span>
-        </button>
-        {mostrarAgregar && (
-          <ModalAgregarProducto
-            onClose={() => setMostrarAgregar(false)}
-            onAdd={() => window.location.reload()}
-          />
-        )}
-
-        {mostrarArchivados && (
-          <ModalArchivados
-            onClose={() => setMostrarArchivados(false)}
-            onRefresh={() => window.location.reload()}
-          />
-        )}
+          <div className="resumen-body">
+            <div className="resumen-item">
+              <span><FaLayerGroup className="inline mr-1" />Total gramos</span>
+              <strong>{italiano.total} g</strong>
             </div>
-    </div>
 
+            <div className="resumen-item">
+              <span><GiGoldBar className="inline mr-1" />Oro</span>
+              <strong>{italiano.prendas} g</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><GiRecycle className="inline mr-1" />Chatarra</span>
+              <strong>{italiano.chatarra} g</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><RiRecycleLine className="inline mr-1" />Recuperable</span>
+              <strong>{italiano.recuperable} g</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN NACIONAL */}
+        <div className="resumen-caja resumen-nacional">
+          <div className="resumen-header">
+            <h3>Nacional</h3>
+          </div>
+
+          <div className="resumen-body">
+            <div className="resumen-item">
+              <span><FaLayerGroup className="inline mr-1" />Total gramos</span>
+              <strong>{nacional.total} g</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><GiGoldBar className="inline mr-1" />Oro</span>
+              <strong>{nacional.prendas} g</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><GiRecycle className="inline mr-1" />Chatarra</span>
+              <strong>{nacional.chatarra} g</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><RiRecycleLine className="inline mr-1" />Recuperable</span>
+              <strong>{nacional.recuperable} g</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCIÓN GENERAL */}
+        <div className="resumen-caja resumen-general">
+          <div className="resumen-header">
+            <h3>General</h3>
+          </div>
+
+          <div className="resumen-body">
+            <div className="resumen-item">
+              <span><BiPackage className="inline mr-1" />Productos</span>
+              <strong>{prendas.length}</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><FaGem className="inline mr-1" style={{color: '#FFD700'}} />Italiano (unidades)</span>
+              <strong>{unidadesItaliano}</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><FaGem className="inline mr-1" style={{color: '#6B8EAD'}} />Nacional (unidades)</span>
+              <strong>{unidadesNacional}</strong>
+            </div>
+
+            <div className="resumen-item">
+              <span><FaWeight className="inline mr-1" />Gramos totales</span>
+              <strong>
+                {prendas
+                  .reduce((acc, p) => {
+                    const gramos = parseFloat(p.gramos || 0);
+                    const existencia = parseFloat(p.existencia || 0);
+                    return acc + gramos * existencia;
+                  }, 0)
+                  .toFixed(2)} g
+              </strong>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* 🔍 Buscador */}
       <input
@@ -170,46 +226,44 @@ const nacional = resumenPorOro("NACIONAL");
       />
 
       {/* 🔽 Filtros mejorados */}
-    <div className="inventario-filtros">
-    <div className="filtro-grupo">
-        <label>Tipo Oro:</label>
-        <select
-        value={filtros.tipoOro}
-        onChange={(e) => setFiltros({ ...filtros, tipoOro: e.target.value })}
-        className={`filtro-select ${
-            filtros.tipoOro === "ITALIANO" ? "filtro-italiano" :
-            filtros.tipoOro === "NACIONAL" ? "filtro-nacional" : ""
-        }`}
-        >
-        <option>Todos</option>
-        <option>ITALIANO</option>
-        <option>NACIONAL</option>
-        </select>
-    </div>
+      <div className="inventario-filtros">
+        <div className="filtro-grupo">
+          <label>Tipo Oro:</label>
+          <select
+            value={filtros.tipoOro}
+            onChange={(e) => setFiltros({ ...filtros, tipoOro: e.target.value })}
+            className={`filtro-select ${
+              filtros.tipoOro === "ITALIANO" ? "filtro-italiano" :
+              filtros.tipoOro === "NACIONAL" ? "filtro-nacional" : ""
+            }`}
+          >
+            <option>Todos</option>
+            <option>ITALIANO</option>
+            <option>NACIONAL</option>
+          </select>
+        </div>
 
-    <div className="filtro-grupo">
-        
-        <label>Tipo Prenda:</label>
-        <select
-        value={filtros.tipoPrenda}
-        onChange={(e) => setFiltros({ ...filtros, tipoPrenda: e.target.value })}
-        className="filtro-select filtro-prenda"
-        >
-        <option>Todos</option>
-          {[...new Set(prendas.map((p) => p.tipo_prenda_nombre))].map((tp) => (
-            <option key={tp}>{tp}</option>
-          ))}
-        </select>
-    </div>
+        <div className="filtro-grupo">
+          <label>Tipo Prenda:</label>
+          <select
+            value={filtros.tipoPrenda}
+            onChange={(e) => setFiltros({ ...filtros, tipoPrenda: e.target.value })}
+            className="filtro-select filtro-prenda"
+          >
+            <option>Todos</option>
+            {[...new Set(prendas.map((p) => p.tipo_prenda_nombre))].map((tp) => (
+              <option key={tp}>{tp}</option>
+            ))}
+          </select>
+        </div>
 
-    <div className="filtro-checkbox chatarra">
-        <label>Chatarra</label>
-        <input
+        <div className="filtro-checkbox chatarra">
+          <label>Chatarra</label>
+          <input
             type="checkbox"
             checked={filtros.chatarra}
             onChange={(e) => {
               const checked = e.target.checked;
-              // Evitar seleccionar ambos a la vez
               if (checked && filtros.recuperable) {
                 alert("No puede seleccionar 'Chatarra' y 'Recuperable' al mismo tiempo.");
                 return;
@@ -217,16 +271,15 @@ const nacional = resumenPorOro("NACIONAL");
               setFiltros({ ...filtros, chatarra: checked });
             }}
           />
-    </div>
+        </div>
 
-    <div className="filtro-checkbox recuperable">
-        <label>Recuperable</label>
-        <input
+        <div className="filtro-checkbox recuperable">
+          <label>Recuperable</label>
+          <input
             type="checkbox"
             checked={filtros.recuperable}
             onChange={(e) => {
               const checked = e.target.checked;
-              // Evitar seleccionar ambos a la vez
               if (checked && filtros.chatarra) {
                 alert("No puede seleccionar 'Chatarra' y 'Recuperable' al mismo tiempo.");
                 return;
@@ -234,21 +287,20 @@ const nacional = resumenPorOro("NACIONAL");
               setFiltros({ ...filtros, recuperable: checked });
             }}
           />
-    </div>
-    </div>
-
+        </div>
+      </div>
 
       {/* 🧾 Tabla */}
       <table className="inventario-tabla">
         <thead>
           <tr>
-            <th>Producto</th>
-            <th>Categoría</th>
-            <th>Material</th>
-            <th>Peso</th>
-            <th>Cantidad</th>
-            <th>Chatarra</th>
-            <th>Recuperable</th>
+            <th><BiPackage className="inline mr-1" />Producto</th>
+            <th><MdCategory className="inline mr-1" />Categoría</th>
+            <th><FaGem className="inline mr-1" />Material</th>
+            <th><FaWeight className="inline mr-1" />Peso</th>
+            <th><FaHashtag className="inline mr-1" />Cantidad</th>
+            <th><FaTag className="inline mr-1" />Chatarra</th>
+            <th><FaTag className="inline mr-1" />Recuperable</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -278,7 +330,7 @@ const nacional = resumenPorOro("NACIONAL");
                 )}
               </td>
 
-              <td >
+              <td>
                 <button
                   className="btn-editar btn-flex"
                   onClick={() => setModalEditar(p)}
@@ -311,6 +363,20 @@ const nacional = resumenPorOro("NACIONAL");
           prenda={modalArchivar}
           onClose={() => setModalArchivar(null)}
           onArchived={cargarPrendas}
+        />
+      )}
+
+      {mostrarAgregar && (
+        <ModalAgregarProducto
+          onClose={() => setMostrarAgregar(false)}
+          onAdd={() => window.location.reload()}
+        />
+      )}
+
+      {mostrarArchivados && (
+        <ModalArchivados
+          onClose={() => setMostrarArchivados(false)}
+          onRefresh={() => window.location.reload()}
         />
       )}
     </div>
