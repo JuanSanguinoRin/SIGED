@@ -1,7 +1,8 @@
 import React from "react";
 import "../css/Modal.css";
+import { MdArchive } from "react-icons/md";
 
-//VENTANA EMERGENTE APRA CUANDO SE QUIERA ARCHIVAR ALGUNA PRENDA QUE NO ESTE A LA VENTA 
+//VENTANA EMERGENTE PARA CUANDO SE QUIERA ARCHIVAR ALGUNA PRENDA QUE NO ESTE A LA VENTA 
 
 export default function ModalArchivar({ prenda, onClose, onArchived }) {
   const handleArchive = async () => {
@@ -21,9 +22,12 @@ export default function ModalArchivar({ prenda, onClose, onArchived }) {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-contenido">
-        <h2>Archivar Prenda</h2>
-        <p>¿Deseas archivar "{prenda.nombre}"?</p>
+      <div className="modal-contenido modal-small">
+        <h2>
+          <MdArchive size={24} />
+          Archivar Prenda
+        </h2>
+        <p>¿Deseas archivar "<strong>{prenda.nombre}</strong>"?</p>
 
         <div className="modal-botones">
           <button className="btn-cancelar" onClick={onClose}>

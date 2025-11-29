@@ -601,7 +601,7 @@ const Caja = () => {
             titulo="VENTAS"
             color="bg-green-500"
             datos={ventas}
-            columnas={["#", "Cliente", "Producto", "Medio Pago", "Total"]}
+            columnas={["#", "Cliente", "Producto", "Medio Pago", "Fecha", "Total"]}
             esActual={datosVista.esActual}
             renderFila={(mov) => (
               <>
@@ -616,6 +616,10 @@ const Caja = () => {
                   </button>
                 </td>
                 <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                {/* NUEVA COLUMNA FECHA */}
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {new Date(mov.fecha).toLocaleDateString("es-CO")}
+                </td>
                 <td className="px-4 py-3 text-right font-semibold">
                   {formatearMonto(mov.monto)}
                 </td>
@@ -628,7 +632,7 @@ const Caja = () => {
             titulo="COMPRAS"
             color="bg-red-500"
             datos={compras}
-            columnas={["#", "Proveedor", "Tipo Material", "Medio Pago", "Total"]}
+            columnas={["#", "Proveedor", "Tipo Material", "Medio Pago","Fecha", "Total"]}
             esActual={datosVista.esActual}
             renderFila={(mov) => (
               <>
@@ -643,6 +647,9 @@ const Caja = () => {
                   </button>
                 </td>
                 <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {new Date(mov.fecha).toLocaleDateString("es-CO")}
+                </td>
                 <td className="px-4 py-3 text-right font-semibold">
                   {formatearMonto(mov.monto)}
                 </td>
@@ -655,7 +662,7 @@ const Caja = () => {
             titulo="INGRESOS (Pagos de Clientes)"
             color="bg-blue-500"
             datos={cuotasEntrada}
-            columnas={["Venta #", "Cliente", "Medio Pago", "Total"]}
+            columnas={["Venta #", "Cliente", "Medio Pago","Fecha", "Total"]}
             esActual={datosVista.esActual}
             renderFila={(mov) => {
               const ventaId = mov.descripcion.match(/Venta #(\d+)/)?.[1] || "—";
@@ -666,6 +673,9 @@ const Caja = () => {
                   <td className="px-4 py-3 font-mono text-blue-600">#{ventaId}</td>
                   <td className="px-4 py-3">{clienteNombre}</td>
                   <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString("es-CO")}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatearMonto(mov.monto)}
                   </td>
@@ -679,7 +689,7 @@ const Caja = () => {
             titulo="EGRESOS (Pagos a Proveedores)"
             color="bg-orange-500"
             datos={cuotasSalida}
-            columnas={["Compra #", "Proveedor", "Medio Pago", "Total"]}
+            columnas={["Compra #", "Proveedor", "Medio Pago","Fecha", "Total"]}
             esActual={datosVista.esActual}
             renderFila={(mov) => {
               const compraId = mov.descripcion.match(/Compra #(\d+)/)?.[1] || "—";
@@ -690,6 +700,9 @@ const Caja = () => {
                   <td className="px-4 py-3 font-mono text-orange-600">#{compraId}</td>
                   <td className="px-4 py-3">{proveedorNombre}</td>
                   <td className="px-4 py-3">{mov.tipo_movimiento_nombre || mov.tipo_movimiento?.nombre}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {new Date(mov.fecha).toLocaleDateString("es-CO")}
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatearMonto(mov.monto)}
                   </td>
@@ -838,13 +851,18 @@ const ModalDetalleMovimiento = ({ movimiento, onClose, esActual }) => {
         
         // ✅ Cargar tipos de oro ANTES de actualizar el estado
         if (data.prendas && data.prendas.length > 0) {
-          const prendasConTipo = await Promise.all(
-            data.prendas.map(async (prenda) => {
-              const tipo_oro = await obtenerTipoOro(prenda.prenda);
-              return { ...prenda, tipo_oro };
-            })
+          const prendasConDatos = await Promise.all(
+          data.prendas.map(async (p) => {
+            const prendaCompleta = await obtenerPrendaCompleta(p.prenda);
+            return {
+              ...p,
+              tipo_oro: prendaCompleta.tipo_oro_nombre,
+              es_chatarra: prendaCompleta.es_chatarra,
+              es_recuperable: prendaCompleta.es_recuperable,
+            };
+          })
           );
-          data.prendas = prendasConTipo;
+          data.prendas = prendasConDatos;
         }
         
         setDetalles(data);
@@ -863,17 +881,10 @@ const ModalDetalleMovimiento = ({ movimiento, onClose, esActual }) => {
     })}`;
   };
 
-  // ✅ Función para obtener tipo de oro desde los datos de inventario
-  const obtenerTipoOro = async (prendaId) => {
-    try {
-      const res = await fetch(apiUrl(`/prendas/prendas/${prendaId}/`));
-      const prenda = await res.json();
-      return prenda.tipo_oro_nombre || "—";
-    } catch (err) {
-      console.error("Error obteniendo tipo de oro:", err);
-      return "—";
-    }
-  };
+  const obtenerPrendaCompleta = async (id) => {
+    const res = await fetch(apiUrl(`/prendas/prendas/${id}/`));
+    return await res.json();  
+};
 
   // ✅ Obtener nombre del tipo de movimiento
   const nombreTipoMovimiento = movimiento.tipo_movimiento_nombre || movimiento.tipo_movimiento?.nombre || "—";
