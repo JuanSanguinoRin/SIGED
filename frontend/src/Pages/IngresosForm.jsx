@@ -7,6 +7,33 @@ const IngresosForm = () => {
   const [metodosPago, setMetodosPago] = useState([]);
   const [mensaje, setMensaje] = useState(null);
 
+  // Helpers de formato/parseo
+  const parseFormattedNumber = (str) => {
+    if (str === null || str === undefined) return 0;
+    if (typeof str === 'number') return str;
+    let s = String(str);
+    s = s.replace(/[^0-9,\.\-]/g, '');
+    if (s.indexOf(',') > -1 && s.indexOf('.') > -1) {
+      s = s.replace(/\./g, '').replace(/,/g, '.');
+    } else if (s.indexOf(',') > -1 && s.indexOf('.') === -1) {
+      s = s.replace(/,/g, '.');
+    }
+    const n = Number(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const formatCurrency = (value) => {
+    const num = Number(value || 0);
+    try {
+      return num.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch (e) {
+      return `$${num.toFixed(2)}`;
+    }
+  };
+
+  const [methodQuery, setMethodQuery] = useState("");
+  const [showMethodList, setShowMethodList] = useState(false);
+
   const [ingreso, setIngreso] = useState({
     monto: "",
     metodo_pago: "",
@@ -30,7 +57,8 @@ const IngresosForm = () => {
     e.preventDefault();
 
     try {
-      if (!ingreso.monto || ingreso.monto <= 0) {
+      const montoNum = parseFormattedNumber(ingreso.monto);
+      if (!montoNum || montoNum <= 0) {
         setMensaje({ tipo: "error", texto: "Ingrese un monto válido" });
         setTimeout(() => setMensaje(null), 3000);
         return;
@@ -43,7 +71,7 @@ const IngresosForm = () => {
       }
 
       await axios.post(apiUrl("/egreso_ingreso/ingresos/"), {
-        monto: Number(ingreso.monto),
+        monto: montoNum,
         metodo_pago: ingreso.metodo_pago,
         descripcion: ingreso.descripcion,
       });
@@ -87,12 +115,10 @@ const IngresosForm = () => {
             Monto <span className="text-red-600">*</span>
           </label>
           <input
-            type="number"
+            type="text"
             name="monto"
-            step="0.01"
-            min="0"
             value={ingreso.monto}
-            onChange={handleChange}
+            onChange={(e) => setIngreso({ ...ingreso, monto: e.target.value })}
             placeholder="Ingrese el monto recibido"
             className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -102,17 +128,29 @@ const IngresosForm = () => {
           <label className="block text-sm font-semibold text-gray-600 mb-2">
             Método de pago <span className="text-red-600">*</span>
           </label>
-          <select
-            name="metodo_pago"
-            value={ingreso.metodo_pago}
-            onChange={handleChange}
-            className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Seleccione un método</option>
-            {metodosPago.map(mp => (
-              <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={methodQuery}
+              onChange={(e) => { setMethodQuery(e.target.value); setShowMethodList(true); }}
+              onFocus={() => setShowMethodList(true)}
+              onBlur={() => setTimeout(() => setShowMethodList(false), 150)}
+              placeholder="Escriba o seleccione un método"
+              className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            {showMethodList && (
+              <div className="absolute left-0 right-0 z-20 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+                {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).map(m => (
+                  <div key={m.id} className="p-2 hover:bg-gray-100 cursor-pointer" onMouseDown={() => { setIngreso({ ...ingreso, metodo_pago: m.id }); setMethodQuery(m.nombre); setShowMethodList(false); }}>
+                    {m.nombre}
+                  </div>
+                ))}
+                {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).length === 0 && (
+                  <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
@@ -135,7 +173,7 @@ const IngresosForm = () => {
           </p>
           <p className="text-2xl font-bold text-green-600 flex items-center gap-2 mt-1">
             <FaMoneyBillWave size={24} />
-            ${Number(ingreso.monto || 0).toFixed(2)}
+            {formatCurrency(parseFormattedNumber(ingreso.monto))}
           </p>
         </div>
 

@@ -4,17 +4,32 @@ import { apiUrl } from "../config/api";
 
 
 const CompraForm = () => {
+  // Formato de moneda colombiana
+  const formatCurrency = (value) => {
+    const num = Number(value || 0);
+    try {
+      return num.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    } catch (e) {
+      return `$${num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+    }
+  };
+
   const [proveedores, setProveedores] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
   const [prendas, setPrendas] = useState([]);
   const [selectedProveedor, setSelectedProveedor] = useState("");
   const [selectedMetodoPago, setSelectedMetodoPago] = useState("");
+  const [proveedorQuery, setProveedorQuery] = useState("");
+  const [showProveedorList, setShowProveedorList] = useState(false);
+  const [methodQuery, setMethodQuery] = useState("");
+  const [showMethodList, setShowMethodList] = useState(false);
   const [descripcion, setDescripcion] = useState("");
   const [items, setItems] = useState([
     { prenda: "", cantidad: 1, precio_por_gramo: 0 },
   ]);
   const [mensaje, setMensaje] = useState(null);
   const [mostrarModalPrenda, setMostrarModalPrenda] = useState(false);
+  const [showPrendaListIndex, setShowPrendaListIndex] = useState(null);
 
   const [esCredito, setEsCredito] = useState(false);
   const [creditoData, setCreditoData] = useState({
@@ -77,6 +92,18 @@ const CompraForm = () => {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const handleProveedorSelect = (proveedor) => {
+    setSelectedProveedor(proveedor.id);
+    setProveedorQuery(proveedor.nombre);
+    setShowProveedorList(false);
+  };
+
+  const handleMetodoSelect = (metodo) => {
+    setSelectedMetodoPago(metodo.id);
+    setMethodQuery(metodo.nombre);
+    setShowMethodList(false);
+  };
+
   // --- Enviar compra al backend ---
   const handleSubmit = async (e) => {
   e.preventDefault();
@@ -127,7 +154,9 @@ const CompraForm = () => {
 
     setMensaje("✅ Compra registrada correctamente");
     setSelectedProveedor("");
+    setProveedorQuery("");
     setSelectedMetodoPago("");
+    setMethodQuery("");
     setDescripcion("");
     setItems([{ prenda: "", cantidad: 1, precio_por_gramo: 0 }]);
     setEsCredito(false);
@@ -158,43 +187,69 @@ const CompraForm = () => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Selección de proveedor */}
-        <div>
+        <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Proveedor:
           </label>
-          <select
+          <input
+            type="text"
+            value={proveedorQuery}
+            onChange={(e) => { setProveedorQuery(e.target.value); setShowProveedorList(true); }}
+            onFocus={() => setShowProveedorList(true)}
+            onBlur={() => setTimeout(() => setShowProveedorList(false), 150)}
+            placeholder="Escriba o seleccione un proveedor"
             className="w-full border rounded-lg p-2"
-            value={selectedProveedor}
-            onChange={(e) => setSelectedProveedor(e.target.value)}
             required
-          >
-            <option value="">Seleccione un proveedor</option>
-            {proveedores.map((prov) => (
-              <option key={prov.id} value={prov.id}>
-                {prov.nombre}
-              </option>
-            ))}
-          </select>
+          />
+          {showProveedorList && (
+            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+              {proveedores.filter(p => p.nombre.toLowerCase().includes((proveedorQuery || '').toLowerCase())).map(prov => (
+                <div
+                  key={prov.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onMouseDown={() => handleProveedorSelect(prov)}
+                >
+                  {prov.nombre}
+                </div>
+              ))}
+              {proveedores.filter(p => p.nombre.toLowerCase().includes((proveedorQuery || '').toLowerCase())).length === 0 && (
+                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Método de pago */}
-        <div>
+        <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Método de pago:
           </label>
-          <select
+          <input
+            type="text"
+            value={methodQuery}
+            onChange={(e) => { setMethodQuery(e.target.value); setShowMethodList(true); }}
+            onFocus={() => setShowMethodList(true)}
+            onBlur={() => setTimeout(() => setShowMethodList(false), 150)}
+            placeholder="Escriba o seleccione un método de pago"
             className="w-full border rounded-lg p-2"
-            value={selectedMetodoPago}
-            onChange={(e) => setSelectedMetodoPago(e.target.value)}
             required
-          >
-            <option value="">Seleccione un método de pago</option>
-            {metodosPago.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombre}
-              </option>
-            ))}
-          </select>
+          />
+          {showMethodList && (
+            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).map(m => (
+                <div
+                  key={m.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onMouseDown={() => handleMetodoSelect(m)}
+                >
+                  {m.nombre}
+                </div>
+              ))}
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).length === 0 && (
+                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Descripción */}
@@ -302,19 +357,46 @@ const CompraForm = () => {
                   <tr key={index}>
                     <td className="border p-2">
                       <div className="flex items-center gap-2">
-                        <select
-                          className="flex-1 border rounded p-1"
-                          value={item.prenda}
-                          onChange={(e) => handleItemChange(index, "prenda", e.target.value)}
-                          required
-                        >
-                          <option value="">Seleccione</option>
-                          {prendas.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.nombre} ({p.tipo_oro_nombre})
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={item.prendaQuery || prendas.find(p => p.id === parseInt(item.prenda))?.nombre || ''}
+                            onChange={(e) => { 
+                              const updated = [...items];
+                              updated[index].prendaQuery = e.target.value;
+                              setItems(updated);
+                              setShowPrendaListIndex(index);
+                            }}
+                            onFocus={() => setShowPrendaListIndex(index)}
+                            onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
+                            className="w-full border rounded p-1"
+                            placeholder="Buscar prenda"
+                            required
+                          />
+                          {showPrendaListIndex === index && (
+                            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-scroll mt-1">
+                              {prendas.filter(p => p.nombre.toLowerCase().includes((item.prendaQuery || '').toLowerCase())).map(p => (
+                                <div
+                                  key={p.id}
+                                  className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                  onMouseDown={() => {
+                                    const updated = [...items];
+                                    updated[index].prenda = p.id;
+                                    updated[index].prendaQuery = p.nombre;
+                                    setItems(updated);
+                                    setShowPrendaListIndex(null);
+                                  }}
+                                >
+                                  <div className="font-medium">{p.nombre}</div>
+                                  <div className="text-xs text-gray-500">{p.tipo_oro_nombre}</div>
+                                </div>
+                              ))}
+                              {prendas.filter(p => p.nombre.toLowerCase().includes((item.prendaQuery || '').toLowerCase())).length === 0 && (
+                                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         {/* 🔹 Botón + */}
                         <button
@@ -349,7 +431,7 @@ const CompraForm = () => {
                         }
                       />
                     </td>
-                    <td className="border p-2 text-center">{subtotal}</td>
+                    <td className="border p-2 text-center">{formatCurrency(subtotal)}</td>
                     <td className="border p-2 text-center">
                       {items.length > 1 && (
                         <button
@@ -379,7 +461,7 @@ const CompraForm = () => {
         {/* Totales */}
         <div className="text-right mt-4">
           <p className="text-lg font-semibold text-gray-800">
-            Total de la compra: ${totalCompra.toFixed(2)}
+            Total de la compra: {formatCurrency(totalCompra)}
           </p>
         </div>
 

@@ -13,6 +13,17 @@ import {
 } from "react-icons/fa";
 import "./../css/Proveedores.css";
 
+// Función para formatear números al estándar español: 53.189,90
+const formatNumber = (value, decimals = 2) => {
+  if (!value && value !== 0) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
 const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -333,9 +344,9 @@ const Proveedores = () => {
                             {compra.prendas.map((p) => (
                               <tr key={p.id}>
                                 <td className="p-2 border-t">{p.prenda_nombre}</td>
-                                <td className="p-2 border-t">{p.prenda_gramos}</td>
+                                <td className="p-2 border-t">{formatNumber(p.prenda_gramos, 2)} g</td>
                                 <td className="p-2 border-t">{p.cantidad}</td>
-                                <td className="p-2 border-t">${p.subtotal}</td>
+                                <td className="p-2 border-t">${formatNumber(p.subtotal, 0)}</td>
                               </tr>
                             ))}
                           </tbody>
