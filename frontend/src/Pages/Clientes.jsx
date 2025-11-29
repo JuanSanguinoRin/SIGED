@@ -6,6 +6,17 @@ import ClientDetail from "../Components/ClientDetail";
 import ClientSearchBar from "../Components/ClientSearchBar";
 import ClientModal from "../Components/ClientModal";
 
+// Función para formatear números al estándar español: 53.189,90
+const formatNumber = (value, decimals = 2) => {
+  if (!value && value !== 0) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
 const Clientes = () => {
   const [clientes, setClientes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");

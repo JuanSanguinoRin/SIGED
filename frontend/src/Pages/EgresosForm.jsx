@@ -4,8 +4,20 @@ import { FaMoneyBillWave } from "react-icons/fa";
 import { apiUrl } from "../config/api";
 
 const EgresosForm = () => {
+  // Formato de moneda colombiana
+  const formatCurrency = (value) => {
+    const num = Number(value || 0);
+    try {
+      return num.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    } catch (e) {
+      return `$${num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+    }
+  };
+
   const [metodosPago, setMetodosPago] = useState([]);
   const [mensaje, setMensaje] = useState(null);
+  const [methodQuery, setMethodQuery] = useState("");
+  const [showMethodList, setShowMethodList] = useState(false);
 
   const [egreso, setEgreso] = useState({
     monto: "",
@@ -30,6 +42,12 @@ const EgresosForm = () => {
   // ==============================================
   const handleChange = (e) => {
     setEgreso({ ...egreso, [e.target.name]: e.target.value });
+  };
+
+  const handleMetodoSelect = (metodo) => {
+    setEgreso({ ...egreso, metodo_pago: metodo.id });
+    setMethodQuery(metodo.nombre);
+    setShowMethodList(false);
   };
 
   // ==============================================
@@ -69,6 +87,7 @@ const EgresosForm = () => {
         metodo_pago: "",
         descripcion: "",
       });
+      setMethodQuery("");
     } catch (err) {
       console.error(err);
       setMensaje({ 
@@ -118,21 +137,35 @@ const EgresosForm = () => {
         </div>
 
         {/* MÉTODO DE PAGO */}
-        <div>
+        <div className="relative">
           <label className="block text-sm font-semibold text-gray-600 mb-2">
             Método de pago <span className="text-red-600">*</span>
           </label>
-          <select
-            name="metodo_pago"
-            value={egreso.metodo_pago}
-            onChange={handleChange}
+          <input
+            type="text"
+            value={methodQuery}
+            onChange={(e) => { setMethodQuery(e.target.value); setShowMethodList(true); }}
+            onFocus={() => setShowMethodList(true)}
+            onBlur={() => setTimeout(() => setShowMethodList(false), 150)}
+            placeholder="Escriba o seleccione un método de pago"
             className="border border-gray-300 p-3 w-full rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            <option value="">Seleccione un método</option>
-            {metodosPago.map(mp => (
-              <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-            ))}
-          </select>
+          />
+          {showMethodList && (
+            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).map(m => (
+                <div
+                  key={m.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onMouseDown={() => handleMetodoSelect(m)}
+                >
+                  {m.nombre}
+                </div>
+              ))}
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).length === 0 && (
+                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* DESCRIPCIÓN */}
@@ -157,7 +190,7 @@ const EgresosForm = () => {
           </p>
           <p className="text-2xl font-bold text-red-600 flex items-center gap-2 mt-1">
             <FaMoneyBillWave size={24} />
-            ${Number(egreso.monto || 0).toFixed(2)}
+            {formatCurrency(egreso.monto)}
           </p>
         </div>
 
@@ -167,6 +200,7 @@ const EgresosForm = () => {
             type="button"
             onClick={() => {
               setEgreso({ monto: "", metodo_pago: "", descripcion: "" });
+              setMethodQuery("");
               setMensaje(null);
             }}
             className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-md transition-colors"

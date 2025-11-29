@@ -14,6 +14,17 @@ import {
 } from "recharts";
 import { FaChartLine, FaCoins, FaBell, FaExclamationCircle, FaBoxOpen, FaShoppingCart } from "react-icons/fa";
 
+// Función para formatear números al estándar español: 53.189,90
+const formatNumber = (value, decimals = 2) => {
+  if (!value && value !== 0) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
 export default function Inicio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -127,10 +138,7 @@ export default function Inicio() {
   };
 
   const formatearMoneda = (valor) => {
-    return `$${parseFloat(valor).toLocaleString("es-CO", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    })}`;
+    return `$${formatNumber(valor, 0)}`;
   };
 
   if (loading) {
@@ -169,7 +177,7 @@ export default function Inicio() {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500">Stock Disponible</p>
-            <p className="text-2xl font-bold text-gray-800">{stockTotal.toFixed(2)} g</p>
+            <p className="text-2xl font-bold text-gray-800">{formatNumber(stockTotal, 2)} g</p>
           </div>
         </div>
 
@@ -179,7 +187,7 @@ export default function Inicio() {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500">En Apartado</p>
-            <p className="text-2xl font-bold text-gray-800">{apartadoTotal.toFixed(2)} g</p>
+            <p className="text-2xl font-bold text-gray-800">{formatNumber(apartadoTotal, 2)} g</p>
           </div>
         </div>
 
@@ -224,7 +232,7 @@ export default function Inicio() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#6b7280', fontSize: 12 }}
-                    tickFormatter={(value) => `$${value / 1000}k`}
+                    tickFormatter={(value) => `$${formatNumber(value / 1000, 0)}k`}
                   />
                   <Tooltip
                     formatter={(value) => formatearMoneda(value)}
@@ -253,7 +261,7 @@ export default function Inicio() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#6b7280', fontSize: 12 }}
-                    tickFormatter={(value) => `$${value / 1000}k`}
+                    tickFormatter={(value) => `$${formatNumber(value / 1000, 0)}k`}
                   />
                   <Tooltip
                     formatter={(value) => formatearMoneda(value)}

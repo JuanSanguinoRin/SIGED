@@ -6,6 +6,53 @@ import { apiUrl } from "../config/api";
 //const BASE_URL = "http://127.0.0.1:8000/api/";
 
 const VentaForm = () => {
+  // Helpers de formato y parseo
+  const formatNumber = (value, decimals = 2, locale = 'es-ES') => {
+    const num = Number(value || 0);
+    try {
+      return num.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    } catch (e) {
+      return num.toFixed(decimals);
+    }
+  };
+
+  const formatCurrency = (value) => {
+    const num = Number(value || 0);
+    try {
+      return num.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } catch (e) {
+      return `$${num.toFixed(2)}`;
+    }
+  };
+
+  // Parse a number possibly typed with thousands separators/comma decimal
+  const parseFormattedNumber = (str) => {
+    if (str === null || str === undefined) return 0;
+    if (typeof str === 'number') return str;
+    // Remove currency symbol and spaces
+    let s = String(str);
+    // remove everything except digits, dots, commas and minus
+    s = s.replace(/[^0-9,\.\-]/g, '');
+    // If contains both dot and comma, assume dot=thousands, comma=decimal
+    if (s.indexOf(',') > -1 && s.indexOf('.') > -1) {
+      s = s.replace(/\./g, '').replace(/,/g, '.');
+    } else {
+      // Only commas -> treat comma as decimal separator
+      if (s.indexOf(',') > -1 && s.indexOf('.') === -1) {
+        s = s.replace(/,/g, '.');
+      }
+      // Only dots -> leave as is (dot decimal)
+    }
+    const n = Number(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  // Estados para autocompletes
+  const [clientQuery, setClientQuery] = useState("");
+  const [showClientList, setShowClientList] = useState(false);
+  const [methodQuery, setMethodQuery] = useState("");
+  const [showMethodList, setShowMethodList] = useState(false);
+  const [showPrendaListIndex, setShowPrendaListIndex] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [prendas, setPrendas] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
@@ -69,14 +116,19 @@ const VentaForm = () => {
   // ==============================================
   // MANEJO DE FORMULARIO
   // ==============================================
-  const handleClienteSelect = (e) => {
-    const nombre = e.target.value;
-    const cliente = clientes.find(c => c.nombre === nombre);
-    setVenta({
-      ...venta,
-      clienteNombre: nombre,
-      clienteId: cliente?.id ?? "",
-    });
+  // Cliente: manejadores para listado filtrable
+  const handleClienteInput = (e) => {
+    const q = e.target.value;
+    setClientQuery(q);
+    setShowClientList(true);
+    // keep typed name in venta but clienteId only set on selection
+    setVenta({ ...venta, clienteNombre: q });
+  };
+
+  const handleClienteSelect = (cliente) => {
+    setVenta({ ...venta, clienteNombre: cliente.nombre, clienteId: cliente.id });
+    setClientQuery(cliente.nombre);
+    setShowClientList(false);
   };
 
   const handleChange = (e) => {
@@ -102,19 +154,36 @@ const VentaForm = () => {
 
   const handlePrendaChange = (i, field, value) => {
     const updated = [...venta.prendas];
-    updated[i][field] = value;
+    if (!updated[i]) updated[i] = { prendaId: "", nombre: "", cantidad: 0, precio_por_gramo: 0, gramo_ganancia: 0 };
 
-    if (field === "nombre") {
+    // Handle precio and ganancia as raw input strings while keeping numeric parsed value
+    if (field === "precio_por_gramo") {
+      updated[i].precio_input = value;
+      updated[i].precio_por_gramo = parseFormattedNumber(value);
+    } else if (field === "gramo_ganancia") {
+      updated[i].ganancia_input = value;
+      updated[i].gramo_ganancia = parseFormattedNumber(value);
+    } else if (field === "nombre") {
+      // selecting a prenda by name: fill defaults but preserve any user-edited inputs
       const prenda = prendas.find(p => p.nombre === value);
+      updated[i].nombre = value;
       if (prenda) {
+        const existing = updated[i] || {};
         updated[i] = {
-          ...updated[i],
+          ...existing,
+          nombre: prenda.nombre,
           prendaId: prenda.id,
           existencia: prenda.existencia,
           gramos: Number(prenda.gramos),
           material: prenda.tipo_oro_nombre,
+          precio_por_gramo: existing.precio_por_gramo || Number(prenda.precio_por_gramo || 0),
+          gramo_ganancia: existing.gramo_ganancia || Number(prenda.gramo_ganancia || 0),
+          precio_input: existing.precio_input ?? (prenda.precio_por_gramo ? String(prenda.precio_por_gramo) : ''),
+          ganancia_input: existing.ganancia_input ?? (prenda.gramo_ganancia ? String(prenda.gramo_ganancia) : ''),
         };
       }
+    } else {
+      updated[i][field] = value;
     }
 
     setVenta({ ...venta, prendas: updated });
@@ -266,33 +335,62 @@ function quantityOrZero(q) {
 
       {/* CLIENTE Y MÉTODO */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div>
+        <div className="relative">
           <label className="block text-sm font-semibold mb-1">Cliente</label>
           <input
-            list="clientes"
-            value={venta.clienteNombre}
-            onChange={handleClienteSelect}
+            type="text"
+            value={clientQuery || venta.clienteNombre}
+            onChange={handleClienteInput}
+            onFocus={() => setShowClientList(true)}
+            onBlur={() => setTimeout(() => setShowClientList(false), 150)}
             className="border p-2 w-full rounded-md"
             placeholder="Escriba o seleccione un cliente"
           />
-          <datalist id="clientes">
-            {clientes.map(c => <option key={c.id} value={c.nombre} />)}
-          </datalist>
+          {showClientList && (
+            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+              {clientes.filter(c => c.nombre.toLowerCase().includes((clientQuery || '').toLowerCase())).map(c => (
+                <div
+                  key={c.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onMouseDown={() => handleClienteSelect(c)}
+                >
+                  {c.nombre}
+                </div>
+              ))}
+              {clientes.filter(c => c.nombre.toLowerCase().includes((clientQuery || '').toLowerCase())).length === 0 && (
+                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div>
+        <div className="relative">
           <label className="block text-sm font-semibold mb-1">Método de pago</label>
-          <select
-            name="metodo_pago"
+          <input
+            type="text"
+            value={methodQuery}
+            onChange={(e) => { setMethodQuery(e.target.value); setShowMethodList(true); }}
+            onFocus={() => setShowMethodList(true)}
+            onBlur={() => setTimeout(() => setShowMethodList(false), 150)}
             className="border p-2 w-full rounded-md"
-            value={venta.metodo_pago}
-            onChange={handleChange}
-          >
-            <option value="">Seleccione</option>
-            {metodosPago.map(mp => (
-              <option key={mp.id} value={mp.id}>{mp.nombre}</option>
-            ))}
-          </select>
+            placeholder="Escriba o seleccione un método de pago"
+          />
+          {showMethodList && (
+            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).map(m => (
+                <div
+                  key={m.id}
+                  className="p-2 hover:bg-gray-100 cursor-pointer"
+                  onMouseDown={() => { setVenta({ ...venta, metodo_pago: m.id }); setMethodQuery(m.nombre); setShowMethodList(false); }}
+                >
+                  {m.nombre}
+                </div>
+              ))}
+              {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).length === 0 && (
+                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -422,22 +520,39 @@ function quantityOrZero(q) {
         <div key={i} className="border p-4 rounded-lg mb-4 bg-gray-50">
           <div className="grid grid-cols-6 gap-2 items-end">
 
-            <div className="col-span-2">
+            <div className="col-span-2 relative">
               <label className="block text-xs font-semibold">Prenda</label>
               <input
-                list="prendas"
+                type="text"
                 className="border p-2 rounded w-full"
                 value={p.nombre}
                 onChange={e => handlePrendaChange(i, "nombre", e.target.value)}
+                onFocus={() => setShowPrendaListIndex(i)}
+                onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
               />
-              <datalist id="prendas">
-                {prendas.map(pr => <option key={pr.id} value={pr.nombre} />)}
-              </datalist>
+
+              {showPrendaListIndex === i && (
+                <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+                  {prendas.filter(pr => pr.nombre.toLowerCase().includes((p.nombre || '').toLowerCase())).map(pr => (
+                    <div
+                      key={pr.id}
+                      className="p-2 hover:bg-gray-100 cursor-pointer"
+                      onMouseDown={() => handlePrendaChange(i, "nombre", pr.nombre)}
+                    >
+                      <div className="font-medium">{pr.nombre}</div>
+                      <div className="text-xs text-gray-500">{pr.tipo_oro_nombre} • {formatNumber(pr.gramos,2)} g</div>
+                    </div>
+                  ))}
+                  {prendas.filter(pr => pr.nombre.toLowerCase().includes((p.nombre || '').toLowerCase())).length === 0 && (
+                    <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
               <label>Peso (g)</label>
-              <input className="border p-2 w-full bg-gray-100 rounded" readOnly value={p.gramos ?? ""} />
+              <input className="border p-2 w-full bg-gray-100 rounded" readOnly value={p.gramos ? `${formatNumber(p.gramos, 2)}g` : ""} />
             </div>
 
             <div>
@@ -455,16 +570,16 @@ function quantityOrZero(q) {
 
             <div>
               <label>Precio/gramo</label>
-              <input type="number" className="border p-2 w-full rounded"
-                value={p.precio_por_gramo}
+              <input type="text" className="border p-2 w-full rounded"
+                value={p.precio_input !== undefined ? p.precio_input : (p.precio_por_gramo ?? '')}
                 onChange={e => handlePrendaChange(i, "precio_por_gramo", e.target.value)}
               />
             </div>
 
             <div>
               <label>Ganancia/gramo</label>
-              <input type="number" className="border p-2 w-full rounded"
-                value={p.gramo_ganancia}
+              <input type="text" className="border p-2 w-full rounded"
+                value={p.ganancia_input !== undefined ? p.ganancia_input : (p.gramo_ganancia ?? '')}
                 onChange={e => handlePrendaChange(i, "gramo_ganancia", e.target.value)}
               />
             </div>
@@ -489,17 +604,17 @@ function quantityOrZero(q) {
       {/* TOTALES */}
       <div className="border-t pt-4 mt-4">
         <h3 className="text-lg font-semibold mb-2">Totales</h3>
-        <p><strong>Total venta:</strong> ${totales.totalVenta.toFixed(2)}</p>
-        <p><strong>Ganancia total:</strong> ${totales.totalGanancia.toFixed(2)}</p>
+        <p><strong>Total venta:</strong> {formatCurrency(totales.totalVenta)}</p>
+        <p><strong>Ganancia total:</strong> {formatCurrency(totales.totalGanancia)}</p>
 
         <p className="mt-2 text-lg text-green-700 font-bold flex items-center gap-2">
           <FaMoneyBillWave size={18} />
-          Subtotal final: ${(totales.totalVenta + totales.totalGanancia).toFixed(2)}
+          Subtotal final: {formatCurrency(totales.totalVenta + totales.totalGanancia)}
         </p>
 
         {venta.credito && (
           <p className="text-purple-700 font-bold mt-2">
-            Total con interés ({creditoData.interes}%): ${totales.totalConInteres.toFixed(2)}
+            Total con interés ({creditoData.interes}%): {formatCurrency(totales.totalConInteres)}
           </p>
         )}
       </div>
