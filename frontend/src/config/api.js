@@ -2,7 +2,7 @@
 const RAW_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.REACT_APP_API_URL ||
-  "siged-production.up.railway.app/api";
+  "https://siged-production.up.railway.app//api";
 
 export const API_BASE = String(RAW_BASE).replace(/\/+$/, "");
 
