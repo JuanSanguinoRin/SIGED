@@ -154,8 +154,9 @@ export default function Inventario() {
           bv = (b.tipo_oro_nombre || '').toString().toLowerCase();
           return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
         case 'peso':
-          av = parseFloat(a.gramos || 0) * parseFloat(a.existencia || 0);
-          bv = parseFloat(b.gramos || 0) * parseFloat(b.existencia || 0);
+          // Ordenar por gramos por unidad (no por total)
+          av = parseFloat(a.gramos || 0);
+          bv = parseFloat(b.gramos || 0);
           return direction === 'asc' ? av - bv : bv - av;
         case 'existencia':
           av = parseFloat(a.existencia || 0);
@@ -386,7 +387,7 @@ export default function Inventario() {
               <td>{p.nombre}</td>
               <td>{p.tipo_prenda_nombre}</td>
               <td>{p.tipo_oro_nombre}</td>
-              <td>{formatNumber(parseFloat(p.gramos || 0) * parseFloat(p.existencia || 0), 2)} g</td>
+              <td>{formatNumber(parseFloat(p.gramos || 0), 2)} g</td>
               <td className={p.existencia > 0 ? "cantidad-verde" : "cantidad-roja"}>
                 {p.existencia}
               </td>
