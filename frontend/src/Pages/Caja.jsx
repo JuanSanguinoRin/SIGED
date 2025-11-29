@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { FaEye, FaMoneyBillWave, FaChevronLeft, FaChevronRight, FaSpinner } from "react-icons/fa";
 
 // ⚠️ IMPORTANTE: Ajusta esta función según tu configuración
-const apiUrl = (path) => `siged-production.up.railway.app/api${path}`;
+const apiUrl = (path) => `https://siged-production.up.railway.app/api${path}`;
 
 const Caja = () => {
   // =============================================
