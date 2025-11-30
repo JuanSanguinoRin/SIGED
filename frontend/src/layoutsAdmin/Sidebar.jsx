@@ -10,7 +10,14 @@ import {
   FaCashRegister,
   FaMoneyBillAlt,
   FaChevronDown,
+  FaShoppingCart,
+  FaShoppingBag,
+  FaHandHoldingUsd,
+  FaWallet,
+  FaArrowCircleDown,
+  FaBalanceScale
 } from "react-icons/fa";
+
 
 export default function Sidebar({
   collapsed,
@@ -112,7 +119,7 @@ export default function Sidebar({
             className="flex items-center justify-between w-full px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors"
           >
             <span className="flex items-center gap-3">
-              <FaMoneyBillAlt /> {!collapsed && "Deudas"}
+              <FaBalanceScale /> {!collapsed && "Deudas"}
             </span>
             {!collapsed && <FaChevronDown className={`transition-transform ${deudasOpen ? "rotate-180" : ""}`} />}
           </button>
@@ -121,26 +128,24 @@ export default function Sidebar({
               <NavLink
                 to="/admin/deudas/cobrar"
                 className={({ isActive }) =>
-                  `block px-4 py-2 rounded-lg text-sm ${
-                    isActive
-                      ? "bg-purple-600 text-white"
-                      : "hover:bg-gray-700"
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm ${
+                    isActive ? "bg-purple-600 text-white" : "hover:bg-gray-700"
                   }`
                 }
               >
-                Cobrar
+                <FaHandHoldingUsd />
+                {!collapsed && "Cobrar"}
               </NavLink>
               <NavLink
                 to="/admin/deudas/pagar"
                 className={({ isActive }) =>
-                  `block px-4 py-2 rounded-lg text-sm ${
-                    isActive
-                      ? "bg-purple-600 text-white"
-                      : "hover:bg-gray-700"
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm ${
+                    isActive ? "bg-purple-600 text-white" : "hover:bg-gray-700"
                   }`
                 }
               >
-                Pagar
+                <FaWallet />
+                {!collapsed && "Pagar"}
               </NavLink>
             </div>
           )}
@@ -179,7 +184,7 @@ export default function Sidebar({
               }`
             }
           >
-            <FaCashRegister /> {!collapsed && "Ventas"}
+            <FaShoppingCart /> {!collapsed && "Ventas"}
           </NavLink>
 
           <NavLink
@@ -203,7 +208,7 @@ export default function Sidebar({
               }`
             }
           >
-            <FaCashRegister /> {!collapsed && "Compras"}
+            <FaShoppingBag /> {!collapsed && "Compras"}
           </NavLink>
 
           <NavLink
@@ -215,7 +220,7 @@ export default function Sidebar({
               }`
             }
           >
-            <FaMoneyBillAlt /> {!collapsed && "Egresos"}
+            <FaArrowCircleDown /> {!collapsed && "Egresos"}
           </NavLink>
           </nav>
         </div>
