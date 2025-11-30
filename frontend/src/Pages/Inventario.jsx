@@ -103,6 +103,51 @@ export default function Inventario() {
     return cumpleBusqueda && cumpleOro && cumplePrenda && cumpleChatarra && cumpleRecuperable;
   });
 
+  // Apply sorting if requested. If no sort, preserve original _index order
+  const prendasOrdenadas = [...prendasFiltradas];
+  if (sortConfig.key) {
+    const { key, direction } = sortConfig;
+    prendasOrdenadas.sort((a, b) => {
+      let av, bv;
+      switch (key) {
+        case 'nombre':
+          av = (a.nombre || '').toString().toLowerCase();
+          bv = (b.nombre || '').toString().toLowerCase();
+          return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        case 'tipo_prenda_nombre':
+          av = (a.tipo_prenda_nombre || '').toString().toLowerCase();
+          bv = (b.tipo_prenda_nombre || '').toString().toLowerCase();
+          return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        case 'tipo_oro_nombre':
+          av = (a.tipo_oro_nombre || '').toString().toLowerCase();
+          bv = (b.tipo_oro_nombre || '').toString().toLowerCase();
+          return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        case 'peso':
+          // Ordenar por gramos por unidad (no por total)
+          av = parseFloat(a.gramos || 0);
+          bv = parseFloat(b.gramos || 0);
+          return direction === 'asc' ? av - bv : bv - av;
+        case 'existencia':
+          av = parseFloat(a.existencia || 0);
+          bv = parseFloat(b.existencia || 0);
+          return direction === 'asc' ? av - bv : bv - av;
+        case 'es_chatarra':
+          av = a.es_chatarra ? 1 : 0;
+          bv = b.es_chatarra ? 1 : 0;
+          return direction === 'asc' ? av - bv : bv - av;
+        case 'es_recuperable':
+          av = a.es_recuperable ? 1 : 0;
+          bv = b.es_recuperable ? 1 : 0;
+          return direction === 'asc' ? av - bv : bv - av;
+        default:
+          return 0;
+      }
+    });
+  } else {
+    // default: preserve original order by _index
+    prendasOrdenadas.sort((a, b) => (a._index || 0) - (b._index || 0));
+  }
+
   return (
     <div className="inventario-container">
       <div className="header-inventario">
@@ -310,7 +355,7 @@ export default function Inventario() {
               <td>{p.nombre}</td>
               <td>{p.tipo_prenda_nombre}</td>
               <td>{p.tipo_oro_nombre}</td>
-              <td>{p.gramos}g</td>
+              <td>{formatNumber(parseFloat(p.gramos || 0), 2)} g</td>
               <td className={p.existencia > 0 ? "cantidad-verde" : "cantidad-roja"}>
                 {p.existencia}
               </td>
