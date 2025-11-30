@@ -10,7 +10,7 @@ export default function Topbar({ onMobileMenuToggle }) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch("https://siged.vercel.app/api/auth/logout/", {
+      const response = await fetch("https://siged-production.up.railway.app/api/auth/logout/", {
         method: "POST",
         credentials: "include", // necesario para borrar la sesión
       });
