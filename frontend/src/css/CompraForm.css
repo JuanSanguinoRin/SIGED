@@ -1,0 +1,75 @@
+.prenda-row {
+  background: #faf9ff;
+  border: 1px solid #e5dbff;
+  padding: 14px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+}
+
+.label-mini {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b2e83;
+  margin-bottom: 4px;
+}
+
+.input-modern {
+  border: 1px solid #cfc8f7;
+  padding: 8px;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.input-readonly {
+  background: #f0eef8;
+  border: 1px solid #dad4f5;
+  padding: 8px;
+  border-radius: 10px;
+  width: 100%;
+  font-weight: 600;
+  color: #5b4a88;
+}
+
+/* Botón eliminar */
+.btn-delete {
+  background: #ffe4e4;
+  border: 1px solid #ffb3b3;
+  color: #d64545;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: 0.2s;
+  height: 38px;
+}
+.btn-delete:hover {
+  background: #ffcccc;
+  transform: scale(1.08);
+}
+
+/* Tarjetas Totales */
+.totales-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.total-card {
+  border-radius: 14px;
+  padding: 16px;
+  color: white;
+  background: linear-gradient(135deg, #8a70d6, #6d50d8);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.total-title {
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.total-value {
+  font-size: 20px;
+  margin-top: 6px;
+  font-weight: 800;
+}

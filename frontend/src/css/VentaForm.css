@@ -1,0 +1,217 @@
+/* === CARD PRINCIPAL === */
+.venta-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0px 8px 24px rgba(0,0,0,0.12);
+  border: 1px solid #eee;
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Animación suave */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* === TÍTULOS === */
+.venta-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #4b2e83;
+  margin-bottom: 20px;
+}
+
+/* === INPUTS === */
+.input-modern {
+  border: 1px solid #d6d6d6;
+  padding: 10px 12px;
+  border-radius: 10px;
+  width: 100%;
+  transition: all 0.2s;
+  background: #fafafa;
+}
+
+.input-modern:focus {
+  border-color: #7444d6;
+  box-shadow: 0 0 0 2px rgba(116, 68, 214, 0.25);
+  background: #fff;
+}
+
+/* === BOTONES MEJORADOS === */
+.btn-purple {
+  background: #7444d6;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-purple:hover {
+  background: #693acc;
+}
+
+.btn-gray {
+  background: #b8b8b8;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.btn-gray:hover {
+  background: #a0a0a0;
+}
+
+.btn-green {
+  background: #27ae60;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.btn-green:hover {
+  background: #1e9a52;
+}
+
+/* === TARJETA DE PRENDA === */
+.prenda-card {
+  background: #f9f6ff;
+  border: 1px solid #e5dbff;
+  padding: 18px;
+  border-radius: 14px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.06);
+}
+
+/* === LISTADOS AUTOCOMPLETE === */
+.autocomplete-box {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  overflow-y: auto;
+  max-height: 190px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.autocomplete-item {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.autocomplete-item:hover {
+  background: #f7f0ff;
+}
+
+/* === SEPARADORES Y SECCIONES === */
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4a3a7a;
+  margin-bottom: 6px;
+}
+
+/* === TOTALES === */
+.total-box {
+  background: #f6f2ff;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e4d8ff;
+}
+
+
+
+/* === FILA DE PRENDA === */
+.prenda-row {
+  background: #faf9ff;
+  border: 1px solid #e5dbff;
+  padding: 14px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0px 6px 14px rgba(0, 0, 0, 0.06);
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* label pequeño */
+.label-mini {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b2e83;
+  margin-bottom: 4px;
+}
+
+/* input de solo lectura elegante */
+.input-readonly {
+  background: #f0eef8;
+  border: 1px solid #dad4f5;
+  padding: 8px;
+  border-radius: 10px;
+  width: 100%;
+  color: #5b4a88;
+  font-weight: 600;
+}
+
+/* botón eliminar */
+.btn-delete {
+  background: #ffe4e4;
+  border: 1px solid #ffb3b3;
+  color: #d64545;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  height: 38px;
+}
+
+.btn-delete:hover {
+  background: #ffcccc;
+  transform: scale(1.08);
+}
+
+/* =================================== */
+/* === TARJETAS DE TOTALES MODERNAS === */
+/* =================================== */
+
+.totales-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.total-card {
+  border-radius: 14px;
+  padding: 16px;
+  color: white;
+  background: linear-gradient(135deg, #8a70d6, #6d50d8);
+  box-shadow: 0px 8px 20px rgba(0,0,0,0.15);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.total-card.green {
+  background: linear-gradient(135deg, #33cc77, #1e9a52);
+}
+
+.total-card.blue {
+  background: linear-gradient(135deg, #4fa8ff, #2c6fcc);
+}
+
+.total-card.yellow {
+  background: linear-gradient(135deg, #ffd86b, #ffb739);
+}
+
+.total-title {
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.total-value {
+  font-size: 20px;
+  margin-top: 6px;
+  font-weight: 800;
+}
+
