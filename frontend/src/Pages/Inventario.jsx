@@ -27,44 +27,13 @@ export default function Inventario() {
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
 
-  // Formateo de números (gramos/pesos)
-  const formatNumber = (value, decimals = 2) => {
-    const num = Number(value || 0);
-    if (isNaN(num)) return "0";
-    try {
-      return num.toLocaleString('es-ES', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    } catch (e) {
-      return num.toFixed(decimals);
-    }
-  };
-
-  // Estado para ordenamiento de columnas
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null }); // direction: 'asc' | 'desc' | null
-
-  const handleSort = (key) => {
-    if (sortConfig.key !== key) {
-      setSortConfig({ key, direction: 'asc' });
-      return;
-    }
-
-    if (sortConfig.direction === 'asc') {
-      setSortConfig({ key, direction: 'desc' });
-      return;
-    }
-
-    // cycle back to default (no sort)
-    setSortConfig({ key: null, direction: null });
-  };
-
   // 🔹 Cargar datos desde API
   const cargarPrendas = async () => {
     try {
       const res = await fetch(apiUrl("/prendas/prendas/"));
       if (!res.ok) throw new Error("Error al obtener prendas");
       const data = await res.json();
-      // preserve original order index so we can return to default ordering
-      const visibles = data.filter((p) => !p.archivado).map((p, i) => ({ ...p, _index: i }));
-      setPrendas(visibles);
+      setPrendas(data.filter((p) => !p.archivado));
     } catch (err) {
       console.error("Error al obtener prendas:", err);
     }
@@ -205,22 +174,22 @@ export default function Inventario() {
           <div className="resumen-body">
             <div className="resumen-item">
               <span><FaLayerGroup className="inline mr-1" />Total gramos</span>
-              <strong>{formatNumber(italiano.total, 2)} g</strong>
+              <strong>{italiano.total} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><GiGoldBar className="inline mr-1" />Oro</span>
-              <strong>{formatNumber(italiano.prendas, 2)} g</strong>
+              <strong>{italiano.prendas} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><GiRecycle className="inline mr-1" />Chatarra</span>
-              <strong>{formatNumber(italiano.chatarra, 2)} g</strong>
+              <strong>{italiano.chatarra} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><RiRecycleLine className="inline mr-1" />Recuperable</span>
-              <strong>{formatNumber(italiano.recuperable, 2)} g</strong>
+              <strong>{italiano.recuperable} g</strong>
             </div>
           </div>
         </div>
@@ -234,22 +203,22 @@ export default function Inventario() {
           <div className="resumen-body">
             <div className="resumen-item">
               <span><FaLayerGroup className="inline mr-1" />Total gramos</span>
-              <strong>{formatNumber(nacional.total, 2)} g</strong>
+              <strong>{nacional.total} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><GiGoldBar className="inline mr-1" />Oro</span>
-              <strong>{formatNumber(nacional.prendas, 2)} g</strong>
+              <strong>{nacional.prendas} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><GiRecycle className="inline mr-1" />Chatarra</span>
-              <strong>{formatNumber(nacional.chatarra, 2)} g</strong>
+              <strong>{nacional.chatarra} g</strong>
             </div>
 
             <div className="resumen-item">
               <span><RiRecycleLine className="inline mr-1" />Recuperable</span>
-              <strong>{formatNumber(nacional.recuperable, 2)} g</strong>
+              <strong>{nacional.recuperable} g</strong>
             </div>
           </div>
         </div>
@@ -277,17 +246,16 @@ export default function Inventario() {
             </div>
 
             <div className="resumen-item">
-                <span><FaWeight className="inline mr-1" />Gramos totales</span>
-                <strong>
-                  {formatNumber(
-                    prendas.reduce((acc, p) => {
-                      const gramos = parseFloat(p.gramos || 0);
-                      const existencia = parseFloat(p.existencia || 0);
-                      return acc + gramos * existencia;
-                    }, 0),
-                    2
-                  )} g
-                </strong>
+              <span><FaWeight className="inline mr-1" />Gramos totales</span>
+              <strong>
+                {prendas
+                  .reduce((acc, p) => {
+                    const gramos = parseFloat(p.gramos || 0);
+                    const existencia = parseFloat(p.existencia || 0);
+                    return acc + gramos * existencia;
+                  }, 0)
+                  .toFixed(2)} g
+              </strong>
             </div>
           </div>
         </div>
@@ -371,18 +339,18 @@ export default function Inventario() {
       <table className="inventario-tabla">
         <thead>
           <tr>
-            <th onClick={() => handleSort('nombre')} className="cursor-pointer"><BiPackage className="inline mr-1" />Producto {sortConfig.key==='nombre' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('tipo_prenda_nombre')} className="cursor-pointer"><MdCategory className="inline mr-1" />Categoría {sortConfig.key==='tipo_prenda_nombre' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('tipo_oro_nombre')} className="cursor-pointer"><FaGem className="inline mr-1" />Material {sortConfig.key==='tipo_oro_nombre' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('peso')} className="cursor-pointer"><FaWeight className="inline mr-1" />Peso {sortConfig.key==='peso' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('existencia')} className="cursor-pointer"><FaHashtag className="inline mr-1" />Cantidad {sortConfig.key==='existencia' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('es_chatarra')} className="cursor-pointer"><FaTag className="inline mr-1" />Chatarra {sortConfig.key==='es_chatarra' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
-            <th onClick={() => handleSort('es_recuperable')} className="cursor-pointer"><FaTag className="inline mr-1" />Recuperable {sortConfig.key==='es_recuperable' && (sortConfig.direction==='asc' ? '▲' : sortConfig.direction==='desc' ? '▼' : '')}</th>
+            <th><BiPackage className="inline mr-1" />Producto</th>
+            <th><MdCategory className="inline mr-1" />Categoría</th>
+            <th><FaGem className="inline mr-1" />Material</th>
+            <th><FaWeight className="inline mr-1" />Peso</th>
+            <th><FaHashtag className="inline mr-1" />Cantidad</th>
+            <th><FaTag className="inline mr-1" />Chatarra</th>
+            <th><FaTag className="inline mr-1" />Recuperable</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {prendasOrdenadas.map((p) => (
+          {prendasFiltradas.map((p) => (
             <tr key={p.id}>
               <td>{p.nombre}</td>
               <td>{p.tipo_prenda_nombre}</td>

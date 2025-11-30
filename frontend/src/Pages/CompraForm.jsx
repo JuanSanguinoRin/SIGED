@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
 import { apiUrl } from "../config/api";
+import ProveedorModal from "../Components/ProveedorModal";
+
 
 
 const CompraForm = () => {
@@ -24,6 +26,7 @@ const CompraForm = () => {
   const [methodQuery, setMethodQuery] = useState("");
   const [showMethodList, setShowMethodList] = useState(false);
   const [descripcion, setDescripcion] = useState("");
+  const [showProveedorModal, setShowProveedorModal] = useState(false);
   const [items, setItems] = useState([
     { prenda: "", cantidad: 1, precio_por_gramo: 0 },
   ]);
@@ -191,16 +194,29 @@ const CompraForm = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Proveedor:
           </label>
-          <input
-            type="text"
-            value={proveedorQuery}
-            onChange={(e) => { setProveedorQuery(e.target.value); setShowProveedorList(true); }}
-            onFocus={() => setShowProveedorList(true)}
-            onBlur={() => setTimeout(() => setShowProveedorList(false), 150)}
-            placeholder="Escriba o seleccione un proveedor"
-            className="w-full border rounded-lg p-2"
-            required
-          />
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={proveedorQuery}
+              onChange={(e) => { setProveedorQuery(e.target.value); setShowProveedorList(true); }}
+              onFocus={() => setShowProveedorList(true)}
+              onBlur={() => setTimeout(() => setShowProveedorList(false), 150)}
+              placeholder="Escriba o seleccione un proveedor"
+              className="w-full border rounded-lg p-2"
+              required
+            />
+
+            {/* 🔥 Botón para abrir modal */}
+            <button
+              type="button"
+              onClick={() => setShowProveedorModal(true)}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 rounded-md"
+            >
+              +
+            </button>
+          </div>
+
+
           {showProveedorList && (
             <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
               {proveedores.filter(p => p.nombre.toLowerCase().includes((proveedorQuery || '').toLowerCase())).map(prov => (
@@ -496,7 +512,22 @@ const CompraForm = () => {
           />
         )}
 
+        {showProveedorModal && (
+        <ProveedorModal
+          onClose={() => setShowProveedorModal(false)}
+          onSave={(nuevoProveedor) => {
+            // 1. Agregar a la lista
+            setProveedores((prev) => [...prev, nuevoProveedor]);
 
+            // 2. Seleccionarlo automáticamente
+            setSelectedProveedor(nuevoProveedor.id);
+            setProveedorQuery(nuevoProveedor.nombre);
+
+            // 3. Cerrar modal
+            setShowProveedorModal(false);
+          }}
+        />
+      )}
 
     </div>
   );
