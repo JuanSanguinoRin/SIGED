@@ -1,6 +1,7 @@
 import React from "react";
-import "../css/Modal.css";
+
 import { MdArchive } from "react-icons/md";
+ import "../css/ModalSimple.css";
 
 //VENTANA EMERGENTE PARA CUANDO SE QUIERA ARCHIVAR ALGUNA PRENDA QUE NO ESTE A LA VENTA 
 
@@ -21,21 +22,17 @@ export default function ModalArchivar({ prenda, onClose, onArchived }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-contenido modal-small">
+    <div className="modal-overlay-simple">
+      <div className="modal-simple">
         <h2>
           <MdArchive size={24} />
           Archivar Prenda
         </h2>
         <p>¿Deseas archivar "<strong>{prenda.nombre}</strong>"?</p>
 
-        <div className="modal-botones">
-          <button className="btn-cancelar" onClick={onClose}>
-            Cancelar
-          </button>
-          <button className="btn-guardar" onClick={handleArchive}>
-            Archivar
-          </button>
+        <div className="modal-simple-buttons">
+          <button className="modal-btn-cancelar" onClick={onClose}>Cancelar</button>
+          <button className="modal-btn-confirmar" onClick={handleArchive}>Archivar</button>
         </div>
       </div>
     </div>
