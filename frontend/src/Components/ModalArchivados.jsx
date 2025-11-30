@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import "../css/Modal.css";
+
+import "../css/ModalSimple.css";
 
 export default function ModalArchivados({ onClose, onRefresh }) {
   const [archivados, setArchivados] = useState([]);
@@ -27,10 +28,10 @@ export default function ModalArchivados({ onClose, onRefresh }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-contenido" style={{ width: "700px" }}>
+    <div className="modal-overlay-simple">
+      <div className="modal-simple-large">
         <h2>📦 Productos Archivados</h2>
-        <table className="inventario-tabla">
+        <table className="modal-simple-table">
           <thead>
             <tr>
               <th>Producto</th>
@@ -51,10 +52,7 @@ export default function ModalArchivados({ onClose, onRefresh }) {
                   <td>{p.gramos}</td>
                   <td>{p.existencia}</td>
                   <td>
-                    <button
-                      onClick={() => handleDesarchivar(p.id)}
-                      className="btn-guardar"
-                    >
+                    <button className="btn-desarchivar" onClick={() => handleDesarchivar(p.id)}>
                       Desarchivar
                     </button>
                   </td>
@@ -69,9 +67,9 @@ export default function ModalArchivados({ onClose, onRefresh }) {
         </table>
 
         <div className="modal-botones">
-          <button className="btn-cancelar" onClick={onClose}>
-            Cerrar
-          </button>
+          <div className="modal-simple-buttons">
+            <button className="modal-btn-cancelar" onClick={onClose}>Cerrar</button>
+          </div>
         </div>
       </div>
     </div>

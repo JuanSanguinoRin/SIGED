@@ -13,16 +13,26 @@
 
 .modal-contenido {
   background: white;
-  padding: 2rem;
+  padding: 1.3rem;        /* 🔥 Menos padding */
   border-radius: 12px;
-  width: 350px;
+  width: 400px;           /* 🔥 Tamaño más parecido al de tu ejemplo */
+  height: 540px;          /* 🔥 Más compacto */
+  max-width: 90%;
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;       /* Evita que nada se salga */
+}
+.modal-scroll {
+  overflow-y: auto;
+  padding-right: 8px;     /* Espacio para evitar cortar el scroll */
 }
 
 .modal-contenido h2 {
   color: #3c3563;
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;   /* Reducido */
 }
 
 .modal-contenido input[type="text"],
@@ -36,16 +46,28 @@
 
 .check-grupo {
   display: flex;
-  justify-content: space-around;
-  margin-bottom: 1rem;
- 
+  justify-content: center;
+  gap: 1rem;
+  grid-column: span 2;
+}
+
+.form-producto input[type="text"],
+.form-producto input[type="number"],
+.campo-grupo,
+.modal-botones {
+  grid-column: span 2; 
 }
 
 .modal-botones {
   display: flex;
   justify-content: space-around;
 }
-
+.btn-cancelar,
+.btn-guardar {
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
 .btn-cancelar {
   background: #ccc;
   padding: 8px 16px;
@@ -105,18 +127,20 @@
 
 /* Centrado y espaciado */
 .form-producto {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.1rem;            /* 🔥 Menos separación */
+  width: 100%;
 }
 
 /* Grupos de campos */
 .campo-grupo {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  width: 100%;
+  gap: 0.5rem;
+  padding: 12px;
+  background: #faf9ff;
+  border-radius: 10px;
 }
 
 /* Selects personalizados */
@@ -127,9 +151,18 @@
   border-radius: 8px;
   border: none;
   outline: none;
-  text-align: center;
-  font-weight: 500;
-  transition: 0.2s;
+}
+
+/* Inputs */
+.modal-contenido input[type="text"],
+.modal-contenido input[type="number"],
+.select-prenda,
+.select-oro {
+  width: 100%;
+  padding: 4px;           /* 🔥 Reducimos padding */
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
 }
 
 .select-prenda {

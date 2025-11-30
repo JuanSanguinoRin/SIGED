@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 
 const API_BASE = "https://siged-production.up.railway.app";
 
+// Función para formatear números al estándar español: 53.189,90
+const formatNumber = (value, decimals = 2) => {
+  if (!value && value !== 0) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
 function SmallSpinner() {
   return <div className="inline-block animate-spin w-4 h-4 border-2 border-t-transparent rounded-full" />;
 }
@@ -574,7 +585,7 @@ const DeudasCobrar = () => {
                                                   {prenda.cantidad}
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-medium text-gray-700">
-                                                  ${parseFloat(prenda.subtotal || 0).toLocaleString()}
+                                                  ${formatNumber(prenda.subtotal, 0)}
                                                 </td>
                                               </tr>
                                             ))}
@@ -593,19 +604,19 @@ const DeudasCobrar = () => {
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">Monto total:</span>
                                       <span className="font-semibold text-gray-800">
-                                        ${parseFloat(deuda.total || 0).toLocaleString()}
+                                        ${formatNumber(deuda.total, 0)}
                                       </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                       <span className="text-gray-600">Monto pagado:</span>
                                       <span className="font-medium text-green-600">
-                                        ${(parseFloat(deuda.total || 0) - parseFloat(deuda.monto_pendiente || 0)).toLocaleString()}
+                                        ${formatNumber(parseFloat(deuda.total || 0) - parseFloat(deuda.monto_pendiente || 0), 0)}
                                       </span>
                                     </div>
                                     <div className="border-t border-gray-300 pt-2 flex justify-between text-base">
                                       <span className="font-semibold text-gray-700">Monto por pagar:</span>
                                       <span className="font-bold text-red-600">
-                                        ${parseFloat(deuda.monto_pendiente || 0).toLocaleString()}
+                                        ${formatNumber(deuda.monto_pendiente, 0)}
                                       </span>
                                     </div>
                                   </div>
@@ -634,7 +645,7 @@ const DeudasCobrar = () => {
                                                   {abono.metodo_pago_nombre || "—"}
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-medium text-green-600">
-                                                  ${parseFloat(abono.monto || 0).toLocaleString()}
+                                                  ${formatNumber(abono.monto, 0)}
                                                 </td>
                                               </tr>
                                             ))}
@@ -645,9 +656,7 @@ const DeudasCobrar = () => {
                                                 Total Abonado:
                                               </td>
                                               <td className="px-3 py-2 text-right text-sm font-bold text-green-700">
-                                                ${deuda.abonos
-                                                  .reduce((sum, a) => sum + parseFloat(a.monto || 0), 0)
-                                                  .toLocaleString()}
+                                                ${formatNumber(deuda.abonos.reduce((sum, a) => sum + parseFloat(a.monto || 0), 0), 0)}
                                               </td>
                                             </tr>
                                           </tfoot>
@@ -724,7 +733,7 @@ const DeudasCobrar = () => {
               <p className="text-sm text-gray-600">
                 Monto pendiente:{" "}
                 <span className="font-semibold text-red-600">
-                  ${parseFloat(abonoModal.deuda.monto_pendiente || 0).toLocaleString()}
+                  ${formatNumber(abonoModal.deuda.monto_pendiente, 0)}
                 </span>
               </p>
             </div>
@@ -746,12 +755,13 @@ const DeudasCobrar = () => {
                 abonoModal.deuda?.cuotas_pendientes > 0 && (
                   <div className="mt-2 text-sm text-blue-600 font-medium">
                     Recomendado por cuota: $
-                    {Number(
+                    {formatNumber(
                       calcularValorCuotaRecomendado(
                         abonoModal.deuda.monto_pendiente,
                         abonoModal.deuda.cuotas_pendientes
-                      )
-                    ).toLocaleString()}
+                      ),
+                      2
+                    )}
                   </div>
                 )}
 

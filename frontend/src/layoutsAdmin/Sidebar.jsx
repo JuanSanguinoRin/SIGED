@@ -10,7 +10,14 @@ import {
   FaCashRegister,
   FaMoneyBillAlt,
   FaChevronDown,
+  FaShoppingCart,
+  FaShoppingBag,
+  FaHandHoldingUsd,
+  FaWallet,
+  FaArrowCircleDown,
+  FaBalanceScale
 } from "react-icons/fa";
+
 
 export default function Sidebar({
   collapsed,
@@ -36,35 +43,36 @@ export default function Sidebar({
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="p-4 hidden md:block">
-          <button
-            onClick={onToggle}
-            className={`w-full text-left font-semibold text-white hover:text-purple-400 transition-colors ${
-              collapsed ? "flex justify-center" : ""
-            }`}
-            aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
-          >
-            {collapsed ? (
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            ) : (
-              <span className="text-base">Menú</span>
-            )}
-          </button>
-        </div>
+        <div className="flex flex-col h-full">
+          <div className="p-4 hidden md:block">
+            <button
+              onClick={onToggle}
+              className={`w-full text-left font-semibold text-white hover:text-purple-400 transition-colors ${
+                collapsed ? "flex justify-center" : ""
+              }`}
+              aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
+            >
+              {collapsed ? (
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              ) : (
+                <span className="text-base">Menú</span>
+              )}
+            </button>
+          </div>
 
-        <nav className="px-4 mt-2 space-y-1 text-white">
+          <nav className="flex-1 px-4 mt-2 space-y-1 text-white overflow-y-auto">
           <NavLink
             to="/admin"
             end
@@ -111,7 +119,7 @@ export default function Sidebar({
             className="flex items-center justify-between w-full px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors"
           >
             <span className="flex items-center gap-3">
-              <FaMoneyBillAlt /> {!collapsed && "Deudas"}
+              <FaBalanceScale /> {!collapsed && "Deudas"}
             </span>
             {!collapsed && <FaChevronDown className={`transition-transform ${deudasOpen ? "rotate-180" : ""}`} />}
           </button>
@@ -120,26 +128,24 @@ export default function Sidebar({
               <NavLink
                 to="/admin/deudas/cobrar"
                 className={({ isActive }) =>
-                  `block px-4 py-2 rounded-lg text-sm ${
-                    isActive
-                      ? "bg-purple-600 text-white"
-                      : "hover:bg-gray-700"
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm ${
+                    isActive ? "bg-purple-600 text-white" : "hover:bg-gray-700"
                   }`
                 }
               >
-                Cobrar
+                <FaHandHoldingUsd />
+                {!collapsed && "Cobrar"}
               </NavLink>
               <NavLink
                 to="/admin/deudas/pagar"
                 className={({ isActive }) =>
-                  `block px-4 py-2 rounded-lg text-sm ${
-                    isActive
-                      ? "bg-purple-600 text-white"
-                      : "hover:bg-gray-700"
+                  `flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm ${
+                    isActive ? "bg-purple-600 text-white" : "hover:bg-gray-700"
                   }`
                 }
               >
-                Pagar
+                <FaWallet />
+                {!collapsed && "Pagar"}
               </NavLink>
             </div>
           )}
@@ -178,7 +184,7 @@ export default function Sidebar({
               }`
             }
           >
-            <FaCashRegister /> {!collapsed && "Ventas"}
+            <FaShoppingCart /> {!collapsed && "Ventas"}
           </NavLink>
 
           <NavLink
@@ -202,7 +208,7 @@ export default function Sidebar({
               }`
             }
           >
-            <FaCashRegister /> {!collapsed && "Compras"}
+            <FaShoppingBag /> {!collapsed && "Compras"}
           </NavLink>
 
           <NavLink
@@ -214,9 +220,10 @@ export default function Sidebar({
               }`
             }
           >
-            <FaMoneyBillAlt /> {!collapsed && "Egresos"}
+            <FaArrowCircleDown /> {!collapsed && "Egresos"}
           </NavLink>
-        </nav>
+          </nav>
+        </div>
       </aside>
     </>
   );

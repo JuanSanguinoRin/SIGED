@@ -1,6 +1,17 @@
 import React from "react";
 import { FaPhone, FaEnvelope, FaIdCard, FaMapMarkerAlt } from "react-icons/fa";
 
+// Función para formatear números al estándar español: 53.189,90
+const formatNumber = (value, decimals = 2) => {
+  if (!value && value !== 0) return '';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
 const ClientDetail = ({ cliente, historial }) => {
   if (!cliente) {
     return (
@@ -77,9 +88,9 @@ const ClientDetail = ({ cliente, historial }) => {
                       venta.prendas.map((p) => (
                         <tr key={p.id} className="border-b border-gray-200">
                           <td className="px-4 py-2 text-gray-700">{p.prenda_nombre}</td>
-                          <td className="px-4 py-2 text-gray-700">{p.prenda_gramos}</td>
+                          <td className="px-4 py-2 text-gray-700">{formatNumber(p.prenda_gramos, 2)} g</td>
                           <td className="px-4 py-2 text-gray-700">{p.cantidad}</td>
-                          <td className="px-4 py-2 text-gray-700">${p.subtotal}</td>
+                          <td className="px-4 py-2 text-gray-700">${formatNumber(p.subtotal, 0)}</td>
                         </tr>
                       ))
                     ) : (
