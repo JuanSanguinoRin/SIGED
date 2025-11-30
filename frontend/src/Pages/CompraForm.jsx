@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ModalAgregarProducto from "../Components/ModalAgregarProducto";
 import { apiUrl } from "../config/api";
 import ProveedorModal from "../Components/ProveedorModal";
+import "../css/CompraForm.css";
 
 
 
@@ -351,134 +352,153 @@ const CompraForm = () => {
           </div>
         )}
 
-        {/* Tabla de prendas */}
-        <div>
-          <h3 className="text-lg font-semibold mb-2 text-gray-800">
-            Detalle de Prendas
-          </h3>
-          <table className="w-full border">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 border">Prenda</th>
-                <th className="p-2 border">Cantidad</th>
-                <th className="p-2 border">Precio por gramo</th>
-                <th className="p-2 border">Subtotal</th>
-                <th className="p-2 border"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => {
-                const subtotal = calcularSubtotal(item).toFixed(2);
-                return (
-                  <tr key={index}>
-                    <td className="border p-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            value={item.prendaQuery || prendas.find(p => p.id === parseInt(item.prenda))?.nombre || ''}
-                            onChange={(e) => { 
-                              const updated = [...items];
-                              updated[index].prendaQuery = e.target.value;
-                              setItems(updated);
-                              setShowPrendaListIndex(index);
-                            }}
-                            onFocus={() => setShowPrendaListIndex(index)}
-                            onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
-                            className="w-full border rounded p-1"
-                            placeholder="Buscar prenda"
-                            required
-                          />
-                          {showPrendaListIndex === index && (
-                            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-40 overflow-y-scroll mt-1">
-                              {prendas.filter(p => p.nombre.toLowerCase().includes((item.prendaQuery || '').toLowerCase())).map(p => (
-                                <div
-                                  key={p.id}
-                                  className="p-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                  onMouseDown={() => {
-                                    const updated = [...items];
-                                    updated[index].prenda = p.id;
-                                    updated[index].prendaQuery = p.nombre;
-                                    setItems(updated);
-                                    setShowPrendaListIndex(null);
-                                  }}
-                                >
-                                  <div className="font-medium">{p.nombre}</div>
-                                  <div className="text-xs text-gray-500">{p.tipo_oro_nombre}</div>
-                                </div>
-                              ))}
-                              {prendas.filter(p => p.nombre.toLowerCase().includes((item.prendaQuery || '').toLowerCase())).length === 0 && (
-                                <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
-                              )}
-                            </div>
-                          )}
+       {/* DETALLE DE PRENDAS - DISEÑO MODERNO */}
+<div className="mt-6">
+  <h3 className="text-xl font-bold text-gray-800 mb-3">Detalle de Prendas</h3>
+
+  {items.map((item, index) => {
+    const prendaSelec = prendas.find(p => p.id === Number(item.prenda));
+    const subtotal = calcularSubtotal(item);
+
+    return (
+      <div key={index} className="prenda-row">
+        <div className="grid grid-cols-6 gap-3 items-end">
+
+          {/* 🔮 Prenda */}
+          <div className="col-span-2">
+            <label className="label-mini">Prenda</label>
+
+            <div className="flex items-center gap-2">
+              {/* Input de búsqueda */}
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  className="input-modern"
+                  value={item.prendaQuery !== undefined ? item.prendaQuery : ""}
+                  onChange={(e) => {
+                    const updated = [...items];
+                    updated[index].prendaQuery = e.target.value;
+                    setItems(updated);
+                    setShowPrendaListIndex(index);
+                  }}
+                  onFocus={() => setShowPrendaListIndex(index)}
+                  onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
+                  placeholder="Buscar prenda"
+                />
+
+                {/* Lista de autocompletar */}
+                {showPrendaListIndex === index && (
+                  <div className="autocomplete-box absolute z-30 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+                    {prendas
+                      .filter(p => p.nombre.toLowerCase().includes((item.prendaQuery || "").toLowerCase()))
+                      .map(p => (
+                        <div
+                          key={p.id}
+                          className="autocomplete-item"
+                          onMouseDown={() => {
+                            const updated = [...items];
+                            updated[index].prenda = p.id;
+                            updated[index].prendaQuery = p.nombre;
+                            setItems(updated);
+                            setShowPrendaListIndex(null);
+                          }}
+                        >
+                          <div className="font-medium">{p.nombre}</div>
+                          <div className="text-xs text-gray-500">{p.tipo_oro_nombre}</div>
                         </div>
+                      ))}
 
-                        {/* 🔹 Botón + */}
-                        <button
-                          type="button"
-                          onClick={() => setMostrarModalPrenda(true)}
-                          className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1 rounded-full text-lg leading-none"
-                          title="Agregar nueva prenda"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                    <td className="border p-2">
-                      <input
-                        type="number"
-                        min="1"
-                        className="w-20 border rounded p-1"
-                        value={item.cantidad}
-                        onChange={(e) =>
-                          handleItemChange(index, "cantidad", e.target.value)
-                        }
-                      />
-                    </td>
-                    <td className="border p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="w-28 border rounded p-1"
-                        value={item.precio_por_gramo}
-                        onChange={(e) =>
-                          handleItemChange(index, "precio_por_gramo", e.target.value)
-                        }
-                      />
-                    </td>
-                    <td className="border p-2 text-center">{formatCurrency(subtotal)}</td>
-                    <td className="border p-2 text-center">
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-500 font-bold"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    {prendas.filter(p =>
+                      p.nombre.toLowerCase().includes((item.prendaQuery || "").toLowerCase())
+                    ).length === 0 && (
+                      <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
+                    )}
+                  </div>
+                )}
+              </div>
 
-          <button
-            type="button"
-            onClick={addItem}
-            className="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-lg"
-          >
-            + Agregar Prenda
+              {/* 🔹 Botón + (volvió, ajustado al estilo moderno) */}
+              <button
+                type="button"
+                onClick={() => setMostrarModalPrenda(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 rounded-xl text-lg leading-none shadow"
+                title="Agregar nueva prenda"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Gramos de la prenda */}
+          <div>
+            <label className="label-mini">Gramos</label>
+            <input
+              className="input-readonly"
+              readOnly
+              value={prendaSelec?.gramos || ""}
+            />
+          </div>
+
+          {/* Cantidad */}
+          <div>
+            <label className="label-mini">Cantidad</label>
+            <input
+              type="number"
+              className="input-modern"
+              min="1"
+              value={item.cantidad}
+              onChange={(e) => handleItemChange(index, "cantidad", e.target.value)}
+            />
+          </div>
+
+          {/* Precio por gramo */}
+          <div>
+            <label className="label-mini">Precio/gramo</label>
+            <input
+              type="number"
+              className="input-modern"
+              value={item.precio_por_gramo}
+              onChange={(e) =>
+                handleItemChange(index, "precio_por_gramo", e.target.value)
+              }
+            />
+          </div>
+
+          {/* Subtotal */}
+          <div>
+            <label className="label-mini">Subtotal</label>
+            <input
+              className="input-readonly"
+              readOnly
+              value={formatCurrency(subtotal)}
+            />
+          </div>
+
+          {/* Botón eliminar */}
+          <button className="btn-delete" onClick={() => removeItem(index)}>
+            ✕
           </button>
         </div>
+      </div>
+    );
+  })}
+
+  {/* Agregar prenda */}
+  <button
+    type="button"
+    onClick={addItem}
+    className="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow"
+  >
+    + Agregar Prenda
+  </button>
+</div>
 
         {/* Totales */}
-        <div className="text-right mt-4">
-          <p className="text-lg font-semibold text-gray-800">
-            Total de la compra: {formatCurrency(totalCompra)}
-          </p>
+        <div className="totales-container mt-6">
+          <div className="total-card purple">
+            <p className="total-title">Total de la Compra</p>
+            <p className="total-value">{formatCurrency(totalCompra)}</p>
+          </div>
         </div>
 
         {/* Botón de guardar */}

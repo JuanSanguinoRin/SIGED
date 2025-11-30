@@ -3,6 +3,8 @@ import axios from "axios";
 import { FaMoneyBillWave } from "react-icons/fa";
 import { apiUrl } from "../config/api";
 import ClientModal from "../Components/ClientModal";
+import "../css/VentaForm.css";
+
 
 //const BASE_URL = "http://127.0.0.1:8000/api/";
 
@@ -325,8 +327,8 @@ function quantityOrZero(q) {
   // JSX
   // ==============================================
   return (
-    <div className="max-w-5xl mx-auto bg-white shadow-xl rounded-xl p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-700">Registrar Venta</h2>
+    <div className="max-w-5xl mx-auto venta-card">
+      <h2 className="venta-title">Registrar Venta</h2>
 
       {/* MENSAJE */}
       {mensaje && (
@@ -363,7 +365,7 @@ function quantityOrZero(q) {
           
 
           {showClientList && (
-            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+            <div className="absolute z-20 left-0 right-0 autocomplete-box mt-1">
               {clientes.filter(c => c.nombre.toLowerCase().includes((clientQuery || '').toLowerCase())).map(c => (
                 <div
                   key={c.id}
@@ -392,7 +394,7 @@ function quantityOrZero(q) {
             placeholder="Escriba o seleccione un método de pago"
           />
           {showMethodList && (
-            <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+            <div className="absolute z-20 left-0 right-0 autocomplete-box mt-1">
               {metodosPago.filter(m => m.nombre.toLowerCase().includes((methodQuery || '').toLowerCase())).map(m => (
                 <div
                   key={m.id}
@@ -413,8 +415,8 @@ function quantityOrZero(q) {
       {/* DESCRIPCIÓN */}
       <div className="mb-6">
         <label className="block text-sm font-semibold text-gray-600 mb-1">Descripción</label>
-        <textarea
-          className="border p-2 w-full rounded-md"
+        <textarea 
+          className="input-modern"
           rows="2"
           name="descripcion"
           value={venta.descripcion}
@@ -447,7 +449,7 @@ function quantityOrZero(q) {
 
       {/* CONFIGURACIÓN DE CRÉDITO */}
       {venta.credito && (
-        <div className="border p-4 rounded bg-gray-50 mb-6">
+        <div className="prenda-card mb-4">
           <h4 className="font-semibold mb-3">Crédito</h4>
           <div className="grid grid-cols-3 gap-4">
             <div>
@@ -479,8 +481,8 @@ function quantityOrZero(q) {
           </div>
           <div className="mt-4">
             <label className="block text-sm font-semibold mb-1">Descripción del crédito</label>
-            <textarea
-              className="border w-full p-2 rounded"
+            <textarea 
+            className="input-modern"
               rows="2"
               value={creditoData.descripcion}
               onChange={e => setCreditoData({ ...creditoData, descripcion: e.target.value })}
@@ -491,7 +493,7 @@ function quantityOrZero(q) {
 
       {/* 🔹 Configuración de apartado */}
             {venta.apartado && (
-            <div className="border p-4 rounded-lg bg-gray-50 mb-6">
+            <div className="prenda-card mb-4">
                 <h4 className="font-semibold text-gray-700 mb-3">Configuración del Apartado</h4>
                 <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -519,8 +521,8 @@ function quantityOrZero(q) {
                 </div>
                 <div className="mt-4">
                   <label className="block text-sm text-gray-600 mb-1">Descripción del apartado</label>
-                  <textarea
-                    className="border p-2 rounded-md w-full"
+                  <textarea 
+                  className="input-modern"
                     rows="2"
                     value={apartadoData.descripcion}
                     onChange={(e) => setApartadoData({ ...apartadoData, descripcion: e.target.value })}
@@ -533,84 +535,97 @@ function quantityOrZero(q) {
       <h3 className="text-lg font-semibold mb-2">Prendas</h3>
 
       {venta.prendas.map((p, i) => (
-        <div key={i} className="border p-4 rounded-lg mb-4 bg-gray-50">
-          <div className="grid grid-cols-6 gap-2 items-end">
+        <div key={i} className="prenda-row">
+  <div className="grid grid-cols-6 gap-3 items-end">
 
-            <div className="col-span-2 relative">
-              <label className="block text-xs font-semibold">Prenda</label>
-              <input
-                type="text"
-                className="border p-2 rounded w-full"
-                value={p.nombre}
-                onChange={e => handlePrendaChange(i, "nombre", e.target.value)}
-                onFocus={() => setShowPrendaListIndex(i)}
-                onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
-              />
+    <div className="col-span-2 relative">
+      <label className="label-mini">Prenda</label>
+      <input
+        type="text"
+        className="input-modern"
+        value={p.nombre}
+        onChange={e => handlePrendaChange(i, "nombre", e.target.value)}
+        onFocus={() => setShowPrendaListIndex(i)}
+        onBlur={() => setTimeout(() => setShowPrendaListIndex(null), 150)}
+      />
 
-              {showPrendaListIndex === i && (
-                <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
-                  {prendas.filter(pr => pr.nombre.toLowerCase().includes((p.nombre || '').toLowerCase())).map(pr => (
-                    <div
-                      key={pr.id}
-                      className="p-2 hover:bg-gray-100 cursor-pointer"
-                      onMouseDown={() => handlePrendaChange(i, "nombre", pr.nombre)}
-                    >
-                      <div className="font-medium">{pr.nombre}</div>
-                      <div className="text-xs text-gray-500">{pr.tipo_oro_nombre} • {formatNumber(pr.gramos,2)} g</div>
-                    </div>
-                  ))}
-                  {prendas.filter(pr => pr.nombre.toLowerCase().includes((p.nombre || '').toLowerCase())).length === 0 && (
-                    <div className="p-2 text-sm text-gray-500">No hay coincidencias</div>
-                  )}
+      {showPrendaListIndex === i && (
+        <div className="autocomplete-box absolute z-30 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
+          {prendas
+            .filter(pr => pr.nombre.toLowerCase().includes((p.nombre || "").toLowerCase()))
+            .map(pr => (
+              <div
+                key={pr.id}
+                className="autocomplete-item"
+                onMouseDown={() => handlePrendaChange(i, "nombre", pr.nombre)}
+              >
+                <div className="font-medium">{pr.nombre}</div>
+                <div className="text-xs text-gray-500">
+                  {pr.tipo_oro_nombre} • {formatNumber(pr.gramos, 2)} g
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
 
-            <div>
-              <label>Peso (g)</label>
-              <input className="border p-2 w-full bg-gray-100 rounded" readOnly value={p.gramos ? `${formatNumber(p.gramos, 2)}g` : ""} />
-            </div>
+    <div>
+      <label className="label-mini">Peso (g)</label>
+      <input
+        className="input-readonly"
+        readOnly
+        value={p.gramos ? `${formatNumber(p.gramos, 2)}g` : ""}
+      />
+    </div>
 
-            <div>
-              <label>Material</label>
-              <input className="border p-2 w-full bg-gray-100 rounded" readOnly value={p.material ?? ""} />
-            </div>
+    <div>
+      <label className="label-mini">Material</label>
+      <input
+        className="input-readonly"
+        readOnly
+        value={p.material ?? ""}
+      />
+    </div>
 
-            <div>
-              <label>Cantidad</label>
-              <input type="number" className="border p-2 w-full rounded"
-                value={p.cantidad}
-                onChange={e => handlePrendaChange(i, "cantidad", e.target.value)}
-              />
-            </div>
+    <div>
+      <label className="label-mini">Cantidad</label>
+      <input
+        type="number"
+        className="input-modern"
+        value={p.cantidad}
+        onChange={e => handlePrendaChange(i, "cantidad", e.target.value)}
+      />
+    </div>
 
-            <div>
-              <label>Precio/gramo</label>
-              <input type="text" className="border p-2 w-full rounded"
-                value={p.precio_input !== undefined ? p.precio_input : (p.precio_por_gramo ?? '')}
-                onChange={e => handlePrendaChange(i, "precio_por_gramo", e.target.value)}
-              />
-            </div>
+    <div>
+      <label className="label-mini">Precio/gramo</label>
+      <input
+        type="text"
+        className="input-modern"
+        value={p.precio_input ?? "0"}
+        onChange={e => handlePrendaChange(i, "precio_por_gramo", e.target.value)}
+      />
+    </div>
 
-            <div>
-              <label>Ganancia/gramo</label>
-              <input type="text" className="border p-2 w-full rounded"
-                value={p.ganancia_input !== undefined ? p.ganancia_input : (p.gramo_ganancia ?? '')}
+    <div>
+              <label className="label-mini" >Ganancia/gramo</label>
+              <input type="text" className="input-modern"
+                value={p.ganancia_input !== undefined ? p.ganancia_input : (p.gramo_ganancia ?? '0,1')}
                 onChange={e => handlePrendaChange(i, "gramo_ganancia", e.target.value)}
               />
-            </div>
-
-            <button className="text-red-600 font-semibold" onClick={() => handleRemovePrenda(i)}>
-              Eliminar
-            </button>
           </div>
 
-          {p.nombre && (
-            <p className="text-xs text-gray-500 mt-1">
-              Existencia disponible: {p.existencia ?? "—"}
-            </p>
-          )}
-        </div>
+    <button className="btn-delete" onClick={() => handleRemovePrenda(i)}>
+      ✕
+    </button>
+  </div>
+
+  {p.nombre && (
+    <p className="text-xs text-gray-500 mt-1">
+      Existencia disponible: {p.existencia ?? "—"}
+    </p>
+  )}
+</div>
       ))}
 
       <button onClick={handleAddPrenda} className="bg-blue-600 text-white px-4 py-2 rounded mb-4">
@@ -618,30 +633,44 @@ function quantityOrZero(q) {
       </button>
 
       {/* TOTALES */}
-      <div className="border-t pt-4 mt-4">
+      <div className="prenda-card mb-4">
         <h3 className="text-lg font-semibold mb-2">Totales</h3>
-        <p><strong>Total venta:</strong> {formatCurrency(totales.totalVenta)}</p>
-        <p><strong>Ganancia total:</strong> {formatCurrency(totales.totalGanancia)}</p>
+        <div className="totales-container">
 
-        <p className="mt-2 text-lg text-green-700 font-bold flex items-center gap-2">
-          <FaMoneyBillWave size={18} />
-          Subtotal final: {formatCurrency(totales.totalVenta + totales.totalGanancia)}
-        </p>
+        <div className="total-card purple">
+          <p className="total-title">Total Venta</p>
+          <p className="total-value">{formatCurrency(totales.totalVenta)}</p>
+        </div>
+
+        <div className="total-card green">
+          <p className="total-title">Ganancia Total</p>
+          <p className="total-value">{formatCurrency(totales.totalGanancia)}</p>
+        </div>
+
+        <div className="total-card blue">
+          <p className="total-title">Subtotal Final</p>
+          <p className="total-value">{formatCurrency(totales.totalVenta + totales.totalGanancia)}</p>
+        </div>
 
         {venta.credito && (
-          <p className="text-purple-700 font-bold mt-2">
-            Total con interés ({creditoData.interes}%): {formatCurrency(totales.totalConInteres)}
-          </p>
+          <div className="total-card yellow">
+            <p className="total-title">Total con interés</p>
+            <p className="total-value">
+              {formatCurrency(totales.totalConInteres)}
+            </p>
+          </div>
         )}
+
+      </div>
       </div>
 
       {/* BOTONES */}
       <div className="mt-6 flex justify-end gap-3">
-        <button onClick={() => window.location.reload()} className="bg-gray-400 text-white px-4 py-2 rounded">
+        <button onClick={() => window.location.reload()}  className="btn-gray">
           Cancelar
         </button>
 
-        <button onClick={handleSubmit} className="bg-green-600 text-white px-4 py-2 rounded">
+        <button onClick={handleSubmit} className="btn-green">
           Guardar venta
         </button>
       </div>
