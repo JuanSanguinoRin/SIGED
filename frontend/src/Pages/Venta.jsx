@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaMoneyBillWave } from "react-icons/fa";
 import { apiUrl } from "../config/api";
+import ClientModal from "../Components/ClientModal";
 
 //const BASE_URL = "http://127.0.0.1:8000/api/";
 
@@ -48,6 +49,8 @@ const VentaForm = () => {
   };
 
   // Estados para autocompletes
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [newClientData, setNewClientData] = useState(null);
   const [clientQuery, setClientQuery] = useState("");
   const [showClientList, setShowClientList] = useState(false);
   const [methodQuery, setMethodQuery] = useState("");
@@ -337,15 +340,28 @@ function quantityOrZero(q) {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="relative">
           <label className="block text-sm font-semibold mb-1">Cliente</label>
-          <input
-            type="text"
-            value={clientQuery || venta.clienteNombre}
-            onChange={handleClienteInput}
-            onFocus={() => setShowClientList(true)}
-            onBlur={() => setTimeout(() => setShowClientList(false), 150)}
-            className="border p-2 w-full rounded-md"
-            placeholder="Escriba o seleccione un cliente"
-          />
+           <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={clientQuery || venta.clienteNombre}
+                  onChange={handleClienteInput}
+                  onFocus={() => setShowClientList(true)}
+                  onBlur={() => setTimeout(() => setShowClientList(false), 150)}
+                  className="border p-2 w-full rounded-md"
+                  placeholder="Escriba o seleccione un cliente"
+                />
+
+                {/* BOTÓN + */}
+                <button
+                  onClick={() => setShowClientModal(true)}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 rounded-md h-full"
+                >
+                  +
+                </button>
+              </div>
+
+          
+
           {showClientList && (
             <div className="absolute z-20 left-0 right-0 bg-white border rounded shadow max-h-48 overflow-y-scroll mt-1">
               {clientes.filter(c => c.nombre.toLowerCase().includes((clientQuery || '').toLowerCase())).map(c => (
@@ -629,9 +645,34 @@ function quantityOrZero(q) {
           Guardar venta
         </button>
       </div>
+        
 
+
+        {/* MODAL DE CLIENTE ⬇⬇⬇ */}
+        {showClientModal && (
+          <ClientModal
+            cliente={{}}
+            isCreating={true}
+            onClose={() => setShowClientModal(false)}
+            onSave={(nuevoCliente) => {
+              setClientes((prev) => [...prev, nuevoCliente]);
+              setVenta({
+                ...venta,
+                clienteId: nuevoCliente.id,
+                clienteNombre: nuevoCliente.nombre,
+              });
+              setClientQuery(nuevoCliente.nombre);
+              setShowClientModal(false);
+            }}
+          />
+        )}
+        
     </div>
   );
+
+  
 };
+
+
 
 export default VentaForm;
