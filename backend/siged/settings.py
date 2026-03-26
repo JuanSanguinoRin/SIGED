@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-cfkx&rwg7hnu+j-)onfrrjz-n3zt%!l$(*w94811!g%za0(is8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["https://siged.vercel.app",]
 
 
 # Application definition
@@ -144,7 +144,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # CORS settings (si usas django-cors-headers)
-CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo
 CORS_ALLOW_CREDENTIALS = True
 
 # Default primary key field type
