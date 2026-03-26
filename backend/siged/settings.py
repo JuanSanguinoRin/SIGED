@@ -29,7 +29,14 @@ SECRET_KEY = 'django-insecure-cfkx&rwg7hnu+j-)onfrrjz-n3zt%!l$(*w94811!g%za0(is8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["https://siged.vercel.app", "https://siged-production.up.railway.app",]
+ALLOWED_HOSTS = ["siged.vercel.app", "siged-production.up.railway.app",]
+CORS_ALLOWED_ORIGINS = [
+    "https://siged.vercel.app",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://siged.vercel.app",
+]
 
 
 # Application definition
